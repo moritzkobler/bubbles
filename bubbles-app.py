@@ -11,9 +11,9 @@ import tempfile
 # Streamlit inputs for configuration
 st.sidebar.header("Configuration")
 
-WIDTH = st.sidebar.slider("Width", min_value=100, max_value=1000, value=600)
-HEIGHT = st.sidebar.slider("Height", min_value=100, max_value=1000, value=900)
-NUMBER_OF_BUBBLES = st.sidebar.slider("Number of Bubbles", min_value=1, max_value=1000, value=20)
+WIDTH = st.sidebar.number_input("Width", value=600, step=1)
+HEIGHT = st.sidebar.number_input("Height", value=900, step=1)
+NUMBER_OF_BUBBLES = st.sidebar.number_input("Number of Bubbles", min_value=1, max_value=1000, value=20, step=1)
 COLOR_SCHEME = st.sidebar.selectbox("Color Scheme", plt.colormaps(), index=plt.colormaps().index('Pastel1'))
 IS_ANIMATED = st.sidebar.checkbox("Animated", value=True)
 IS_DISTORTED = st.sidebar.checkbox("Distorted", value=True)
@@ -38,6 +38,9 @@ noise_filter.feTurbulence(type="fractalNoise", baseFrequency=0.8, numOctaves=10,
 noise_filter.feComposite(operator="in", in_="turbulence", in2="SourceAlpha", result="composite")
 noise_filter.feColorMatrix(in_="composite", type="luminanceToAlpha")
 noise_filter.feBlend(in_="SourceGraphic", in2="composite", mode="multiply")
+
+bg_rect = dwg.rect(insert=(0, 0), size=(WIDTH, HEIGHT), fill='white')
+dwg.add(bg_rect)
 
 # Generate the bubbles
 for i in range(NUMBER_OF_BUBBLES):
