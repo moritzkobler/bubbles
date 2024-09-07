@@ -3,9 +3,10 @@ import svgwrite
 import random
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import colorsys
 from datetime import datetime
-import os
 import tempfile
+import numpy as np
 
 ################# UTILITIES #################
 def w(p):
@@ -13,6 +14,112 @@ def w(p):
 
 def h(p):
     return p/100 * HEIGHT
+
+# Function to convert hex to HSL with a custom lightness value
+def hex_to_rgb_with_luminosity(hex_color, luminosity):
+    # Convert hex to RGB (0-1 range) using mcolors
+    rgb = mcolors.to_rgb(hex_color)
+    
+    # Convert RGB to HLS using colorsys
+    h, l, s = colorsys.rgb_to_hls(*rgb)
+    
+    # Use the provided luminosity value (0-1 range) and clamp between 0 and 1
+    l = max(0, min(1, luminosity))
+    
+    # Convert back to RGB from HLS
+    adjusted_rgb = colorsys.hls_to_rgb(h, l, s)
+    
+    # Return the adjusted RGB value as a hex string
+    return mcolors.to_hex(adjusted_rgb)
+    # Convert hex to RGB (0-1 range) using mcolors
+    rgb = mcolors.to_rgb(hex_color)
+    
+    # Convert RGB to HLS using colorsys
+    h, l, s = colorsys.rgb_to_hls(*rgb)
+    
+    # Use the provided luminosity value (0-1 range) and clamp between 0 and 1
+    l = max(0, min(1, luminosity))
+    
+    # Convert H to degrees (0-360), S and L to percentages (0-100%)
+    h_deg = h * 360
+    s_percent = s * 100
+    l_percent = l * 100
+    
+    # Return the formatted HSL string for SVG
+    return f"hsl({h_deg:.0f}, {s_percent:.0f}%, {l_percent:.0f}%)"
+    # Convert hex to RGB (0-1 range) using mcolors
+    rgb = mcolors.to_rgb(hex_color)
+    
+    # Convert RGB to HLS using the colorsys module
+    h, l, s = colorsys.rgb_to_hls(*rgb)
+    
+    # Use the provided luminosity value (0-1 range)
+    l = max(0, min(1, luminosity))  # Clamp luminosity to [0, 1] just in case
+    
+    # Return the formatted HSL string
+    return f"hsl({h:.2f}, {s:.2f}, {l:.2f})"
+    # Convert hex to RGB (0-1 range)
+    rgb = mcolors.to_rgb(hex_color)
+    
+    # Convert RGB to HSL (HLS in matplotlib, but effectively the same)
+    h, l, s = mcolors.rgb_to_hls(*rgb)
+    
+    # Use the provided luminosity value (0-1 range)
+    l = max(0, min(1, luminosity))  # Clamp luminosity to [0, 1] just in case
+    
+    # Return the formatted HSL string
+    return f"hsl({h:.2f}, {s:.2f}, {l:.2f})"
+
+def complementary_color(hex_color):
+    # Convert the hex color to an RGB tuple
+    rgb = mcolors.to_rgb(hex_color)
+    
+    # Find the complementary color by subtracting each channel from 1 (since mcolors uses values between 0 and 1)
+    comp_rgb = [(1.0 - channel) for channel in rgb]
+    
+    # Convert the complementary RGB back to hex
+    return mcolors.to_hex(comp_rgb)
+
+def calculate_control(prev, p, next, z=0.5):
+    # Unpack the points
+    x_prev, y_prev = prev
+    x_p, y_p = p
+    x_next, y_next = next
+    
+    # Step 1: Find the direction vector from the previous to the next point
+    direction_x = x_next - x_prev
+    direction_y = y_next - y_prev
+    
+    # Step 2: Normalize the direction vector and scale it by z times the distance ab
+    scaled_vector_x = z * direction_x
+    scaled_vector_y = z * direction_y
+    
+    # Step 3: Translate the vector to the point b to get the final point c
+    x_c = x_p - scaled_vector_x
+    y_c = y_p - scaled_vector_y
+    
+    return (x_c, y_c)
+
+def linear_interpolation(start, end, n_steps):
+    step_size = (end - start) / (n_steps - 1)  # Calculate the step size
+    return [start + i * step_size for i in range(n_steps)]
+
+def log_interpolation(start, end, n_steps):
+    # Ensure the minimum and maximum are positive (since log doesn't work with non-positive numbers)
+    if start <= 0 or end <= 0:
+        raise ValueError("Both start and end must be greater than 0.")
+    
+    # Generate n logarithmically spaced points between log(start) and log(end)
+    log_min = np.log(start)
+    log_max = np.log(end)
+    
+    # Linearly interpolate between the logarithms
+    log_steps = np.linspace(log_min, log_max, n_steps)
+    
+    # Exponentiate to get the original values back
+    steps = np.exp(log_steps)
+    
+    return steps
 
 ################# GENERATION FUNCTIONS #################
 # NOTE: scope of variables in here is pretty horribly done...
@@ -38,7 +145,7 @@ def generate_bubbles(dwg):
         max_r = 30
         r = (max_r - min_r) * random.random() + min_r
         
-        base_color = random.choice(colors)
+        base_color = random.choice(COLORS)
         
         # Define a linear gradient
         gradient_id = f"gradient-{i}"
@@ -74,7 +181,7 @@ def generate_bubbles(dwg):
 
     # Add noise if required
     if HAS_NOISE:
-        rect = dwg.rect(insert=(0, 0), size=(WIDTH, HEIGHT), fill=random.choice(colors), fill_opacity=0.2, filter="url(#noiseFilter)")
+        rect = dwg.rect(insert=(0, 0), size=(WIDTH, HEIGHT), fill=random.choice(COLORS), fill_opacity=0.2, filter="url(#noiseFilter)")
         dwg.add(rect)
         
     return dwg
@@ -105,8 +212,7 @@ def generate_filters(dwg):
             values=[w(MIN_X_PERC), w(MAX_X_PERC), w(MIN_X_PERC)],  # cy values at keyframes as a list of strings
             keyTimes="0;0.5;1",  # Keyframe times as a space-separated string
             calcMode="spline",  # Use spline mode for smooth easing
-            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"  # Control points for easing
-                
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"  # Control points for easing                
         )
         
         animation_y = dwg.animate(
@@ -142,34 +248,142 @@ def generate_filters(dwg):
         dwg.add(circle_enabler)
 
     ######## draw shapes ########
-    circle = dwg.circle(center=(w(50), h(50)), r=w(40), fill=random.choice(colors), filter=f"url(#filterTextured)")
+    circle = dwg.circle(center=(w(50), h(50)), r=w(40), fill=random.choice(COLORS), filter=f"url(#filterTextured)")
     dwg.add(circle)
     
     return dwg
+ 
+def generate_waves(dwg):
+    regular_wave_horizons = linear_interpolation(HORIZON_Y, LAST_WAVE_Y, NUMBER_OF_WAVES) if SPACING_TYPE == "Linear" else log_interpolation(HORIZON_Y, LAST_WAVE_Y, NUMBER_OF_WAVES)
     
+    # Define the shadow filter using feGaussianBlur and feOffset
+    if HAS_SHADOW: 
+        filter_element = dwg.filter(id="shadow")
+        filter_element.feGaussianBlur(in_="SourceAlpha", stdDeviation=SHADOW_BLURRINESS, result="blur")
+        filter_element.feOffset(in_="blur", dx=0, dy=-h(SHADOW_OFFSET_Y), result="offsetBlur")
+        filter_element.feFlood(flood_color=SHADOW_COLOR, flood_opacity=SHADOW_OPACITY, result="floodShadow")  # Set a less intense shadow color
+        filter_element.feComposite(in_="floodShadow", in2="offsetBlur", operator="in", result="compositeShadow")
+    
+        dwg.defs.add(filter_element)
+
+    # create points
+    for i, regular_horizon in enumerate(regular_wave_horizons):
+        # calculate the minimum distance between the current horizon and the previous and next ones...
+        # only this complicated because of non-linear steps...
+        min_horizon_dist = 0
+        if i == 0 and len(regular_wave_horizons) > 1: min_horizon_dist = abs(regular_wave_horizons[i+1] - regular_horizon) 
+        elif i == len(regular_wave_horizons) - 1: min_horizon_dist = abs(regular_horizon - regular_wave_horizons[i-1])
+        else: min_horizon_dist = min(abs(regular_wave_horizons[i+1] - regular_horizon), abs(regular_horizon - regular_wave_horizons[i-1]))
+        
+        # define the currrent horizon
+        horizon = regular_horizon + WAVE_SPACING_RANDOMNESS * min_horizon_dist * (random.random() - 0.5)
+        start_point = (0, 100)
+        wave_points = []
+        number_of_wave_points = random.choice(range(NUMBER_OF_WAVE_POINTS_MIN, NUMBER_OF_WAVE_POINTS_MAX + 1))
+        
+        first_wave_point_x = FIRST_POINT_START_MAX * random.random()
+        # TODO: To do the animation properly, I'd likely want to generate a separate set of points.
+        # That would then also change the calculation of the control points for the to_path below...
+        for j in range(number_of_wave_points):
+            regular_x = first_wave_point_x + (j + 1) * (100 - first_wave_point_x)/(number_of_wave_points + 1)
+            regular_y = horizon
+            x = regular_x + (100/number_of_wave_points) * WAVE_POINT_SPACING_RANDOMNESS * (random.random() - 0.5)
+            y = regular_y + WAVE_HEIGHT_FACTOR * (random.random() - 0.5)
+            
+            wave_points.append((x, y))
+            
+        end_point = (100, 100)
+        
+        # generate the path TODO: Make into a standalone function
+        from_path_data = f"M {w(start_point[0])},{h((start_point[1]))}\n"
+        from_path_data += f"L {w(start_point[0])},{h(horizon)}\n"
+        to_path_data = from_path_data # start off with the same to_path
+        
+        for k, (p_x, p_y) in enumerate(wave_points):
+            p_prev = (start_point[0], horizon) if k == 0 else wave_points[k-1]
+            p_next = (end_point[0], horizon) if k == len(wave_points) - 1 else wave_points[k+1]
+            control_x, control_y = calculate_control(p_prev, (p_x, p_y), p_next, CONTROL_ARM_LENGTH)
+            from_path_data += f"S {w(control_x)},{h(control_y)} {w(p_x)},{h(p_y)}\n"
+            to_path_data += f"S {w(control_x)},{h(control_y)} {w(p_x)},{h((1 + ANIMATION_STRENGTH * (random.random() - 0.5)) * p_y)}\n"
+        
+        # construct the the final leg
+        control_x = wave_points[-1][0] + 0.5 * (end_point[0] - wave_points[-1][0])
+        control_y = wave_points[-1][1] + 0.5 * (horizon - wave_points[-1][1])
+        
+        from_path_data += f"S {w(control_x)},{h(control_y)} {w(end_point[0])},{h(horizon)}\n"
+        from_path_data += f"L {w(end_point[0])},{h(end_point[1])}\n"
+        from_path_data += f"Z"
+        
+        # add the same endpoint logic to the to_path
+        to_path_data += f"S {w(control_x)},{h(control_y)} {w(end_point[0])},{h(horizon)}\n"
+        to_path_data += f"L {w(end_point[0])},{h(end_point[1])}\n"
+        to_path_data += f"Z"
+        
+        from_path = from_path_data.replace('\n', ' ').strip()
+        to_path = to_path_data.replace('\n', ' ').strip()
+        
+        # color stuffs...
+        fill_color = FILL_COLOR if SINGLE_COLOR else random.choice(COLORS)
+        if ADD_FADING_EFFECT:
+            luminosity = MAX_LUMINOSITY - i * (MAX_LUMINOSITY - MIN_LUMINOSITY)/NUMBER_OF_WAVES
+            fill_color = hex_to_rgb_with_luminosity(fill_color, luminosity if INVERT_FADE else 1 - luminosity) 
+        
+        wave = dwg.path(d=from_path, fill=fill_color)
+        if HAS_SHADOW: wave_shadow = dwg.path(d=from_path, fill="blue", filter="url(#shadow)")
+        
+        # NOTE: The animation only works if x and y coordinates in the path are comma separated, and points are space separated
+        # i.e. 'S 50 50, 20 20' doesn't work, but 'S 50,50 20,20' does... 
+        if IS_ANIMATED:
+            animation = dwg.animate(
+                attributeName="d",
+                dur=ANIMATION_DURATION,
+                repeatCount="indefinite" if REPEAT_ANIMATION else 1,
+                values=[from_path, to_path, from_path],
+                keyTimes="0;0.5;1",
+                calcMode="spline",
+                keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+            )
+            
+            wave.add(animation)
+            if HAS_SHADOW: wave_shadow.add(animation)
+        
+        if HAS_SHADOW: dwg.add(wave_shadow)
+        dwg.add(wave)
+        
+    if HAS_NOISE:
+        rect = dwg.rect(insert=(0, 0), size=(WIDTH, HEIGHT), fill=random.choice(COLORS), fill_opacity=0.2, filter="url(#noiseFilter)")
+        dwg.add(rect)
+    
+    return dwg
+        
 ################# SIDEBAR CONFIGURATION #################
 # Streamlit inputs for configuration
+st.set_page_config(layout="wide")
 st.sidebar.header("Configuration")
+SEED = st.sidebar.number_input("Random Seed", value=3)
 with st.sidebar.expander("General Settings"):
     WIDTH = st.number_input("Width", value=600, step=1)
     HEIGHT = st.number_input("Height", value=900, step=1)
-    COLOR_SCHEME = st.selectbox("Color Scheme", plt.colormaps(), index=plt.colormaps().index('Pastel1'))
+    valid_color_schemes = [cmap_name for cmap_name in plt.colormaps() if hasattr(plt.get_cmap(cmap_name), 'colors')]
+    COLOR_SCHEME = st.selectbox("Color Scheme", valid_color_schemes, index=valid_color_schemes.index('viridis'))
+    COLORS = [mcolors.rgb2hex(color) for color in plt.get_cmap(COLOR_SCHEME).colors]
     BACKGROUND_COLOR = st.text_input("Background Color", value="white")
+
+with st.sidebar.expander("General Animation Settings"):
     IS_ANIMATED = st.checkbox("Animated", value=True)
     REPEAT_ANIMATION = st.checkbox("Repeat Animation", value=True)
-    SAVE_OUTPUT = st.checkbox("Save Output", value=False)
-    # DISPLAY_OUTPUT = st.checkbox("Display Output", value=True)
-    SEED = st.number_input("Random Seed", value=1)
+    ANIMATION_DURATION_INPUT = st.number_input("Animation Duration in s", value=10.0, step=0.1)
+    ANIMATION_DURATION = f"{ANIMATION_DURATION_INPUT}s"
 
-MODULE = st.sidebar.selectbox("Type of Graphic", ["Bubbles", "Filters", "Waves"], index=1)
-
+MODULE = st.sidebar.selectbox("Type of Graphic", ["Bubbles", "Filters", "Waves", "Radial Waves", "Splotches"], index=2)
+# TODO: 1) clean up the filters to have the general settings actually apply to everything (check animation...),
+# and 2) rework the animation in bubbles to actually use the animation duration setting (+ another setting prbably) 
+# rather than the weird speed construct...
 if MODULE == "Bubbles":
     NUMBER_OF_BUBBLES = st.sidebar.number_input("Number of Bubbles", min_value=1, max_value=1000, value=20, step=1)
     IS_DISTORTED = st.sidebar.checkbox("Distorted", value=True)
     HAS_NOISE = st.sidebar.checkbox("Has Noise", value=False)
 if MODULE == "Filters":
-    ANIMATION_DURATION_INPUT = st.sidebar.number_input("Animation Duration in s", value=5.0, step=0.1)
-    ANIMATION_DURATION = f"{ANIMATION_DURATION_INPUT}s"
     with st.sidebar.expander("Texture Settings"):
         TEXTURE_TYPE = st.selectbox("Color Scheme", ["fractalNoise", "turbulence"], index=0)
         BASE_FREQUENCY = st.number_input("Base Frequency", value=0.05, step=0.1)
@@ -180,7 +394,7 @@ if MODULE == "Filters":
         DIFFUSE_CONSTANT = st.number_input("Diffuse Constant", value=1.0, step=1.0)
         LIGHTING_COLOR_INPUT = st.text_input("Lighting Color", value="white")
         
-    with st.sidebar.expander("Animation Settings"):        
+    with st.sidebar.expander("Filter Animation Settings"):        
         MIN_X_PERC = st.number_input("min x (relative to canvas width)", value=10.0, step=1.0)
         MAX_X_PERC = st.number_input("max x (relative to canvas width)", value=90.0, step=1.0)
         st.divider()
@@ -188,12 +402,51 @@ if MODULE == "Filters":
         MAX_Y_PERC = st.number_input("max y (relative to canvas width)", value=10.0, step=1.0)
         st.divider()
         MIN_Z = st.number_input("min z", value=5.0, step=1.0)
-        MAX_Z = st.number_input("max z", value=500.0, step=1.0)
+        MAX_Z = st.number_input("max z", value=500.0, step=1.0)    
+if MODULE == "Waves":
+    with st.sidebar.expander("Layout Settings"):
+        NUMBER_OF_WAVES = st.number_input("Number of Waves", min_value=1, max_value=1000, value=30, step=1)
+        HORIZON_Y = st.number_input("Horizon Position", value=15.0, step=1.0)
+        LAST_WAVE_Y = st.number_input("Last Wave", value=80.0, step=1.0)
+        SPACING_TYPE = st.selectbox("Spacing Type", ["Linear", "Logarithmic"], index=1)
+        WAVE_SPACING_RANDOMNESS = st.number_input("Wave Spacing Randomness", value=0.0, min_value=0.0, max_value=1.0, step=0.05)
+    
+    with st.sidebar.expander("Wave Settings"):
+        NUMBER_OF_WAVE_POINTS_MIN = st.number_input("Min number of Wave Points", min_value=1, value=2, step=1)
+        NUMBER_OF_WAVE_POINTS_MAX = st.number_input("Max number of Wave Points", min_value=1, value=6, step=1)
+        WAVE_HEIGHT_FACTOR = st.number_input("Wave Height Indicator", value=15.0, step=1.0)
+        FIRST_POINT_START_MAX = st.number_input("Max First Point Start", value=0.0, step=1.0)
+        WAVE_POINT_SPACING_RANDOMNESS = st.number_input("Point Spacing Randomness", value=0.0, min_value=0.0, max_value=1.0, step=0.05)
+        CONTROL_ARM_LENGTH = st.number_input("Control Arm Length (Relative)", value=0.2, min_value=0.0, step=0.01)
         
+    with st.sidebar.expander("Color Settings"):
+        SINGLE_COLOR = st.checkbox("Use Single Color", value=True)
+        if (SINGLE_COLOR):
+            FILL_COLOR = st.color_picker("Choose Color", value="#FF4800")
+        
+        HAS_NOISE = st.checkbox("Has Noise", value=True)
+        ADD_FADING_EFFECT = st.checkbox("Add Fade", value=True)
+        if ADD_FADING_EFFECT:
+            INVERT_FADE = st.checkbox("Invert Fade", value=False)
+            MIN_LUMINOSITY = st.number_input("Minimum Luminosity", min_value=0.0, max_value=1.0, value=1.0, step=0.1)
+            MAX_LUMINOSITY = st.number_input("Maximum Luminosity", min_value=0.0, max_value=1.0, value=0.2, step=0.1)
+            st.divider()
+            
+    with st.sidebar.expander("Shadow Settings"):
+        HAS_SHADOW = st.checkbox("Add Wave Shadow", value=False)
+        if HAS_SHADOW:
+            if SINGLE_COLOR:
+                SHADOW_COLOR_COMPLEMENTARY = st.checkbox("Complementary Color", value=False)
+            SHADOW_COLOR = st.color_picker("Shadow Color", complementary_color(FILL_COLOR) if SINGLE_COLOR and SHADOW_COLOR_COMPLEMENTARY else "#000")
+            SHADOW_BLURRINESS = st.number_input("Shadow Blurriness", value=20, min_value=0, step=1)
+            SHADOW_OPACITY = st.number_input("Shadow Opacity", min_value=0.0, max_value=1.0, value=0.2, step=0.05)
+            SHADOW_OFFSET_Y = st.number_input("Shadow Offset (relative, negative)", value=2.0, step=0.1)
+    
+    with st.sidebar.expander("Wave Animation Settings"):
+        ANIMATION_STRENGTH = st.number_input("Animation Strength", value=0.15, min_value=0.0, step=0.05)
 ################# MAIN BODY #################
 # set up the drawing environment
 random.seed(SEED)
-colors = [mcolors.rgb2hex(color) for color in plt.get_cmap(COLOR_SCHEME).colors]
 dwg = svgwrite.Drawing(size=(WIDTH, HEIGHT))
 
 # add the default background 
@@ -206,16 +459,9 @@ if BACKGROUND_COLOR.strip().lower() != "" and BACKGROUND_COLOR.strip().lower() !
 
 if MODULE == "Bubbles": dwg = generate_bubbles(dwg)
 if MODULE == "Filters": dwg = generate_filters(dwg)
-if MODULE == "Waves": st.info("Waves coming soon!")
-
-# Save output if required
-if SAVE_OUTPUT:
-    output_dir = 'output'
-    os.makedirs(output_dir, exist_ok=True)
-    filename = f'bubbles_no-{NUMBER_OF_BUBBLES}_colors-{COLOR_SCHEME}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.svg'
-    full_path = os.path.join(output_dir, filename)
-    dwg.saveas(full_path)
-    st.sidebar.write(f"File saved as: {full_path}")
+if MODULE == "Waves": dwg = generate_waves(dwg)
+if MODULE == "Radial Waves": st.info("Radial waves coming soon!") # TODO
+if MODULE == "Splotches": st.info("Splotches coming soon!") # TODO
 
 # Display output as an image
 with tempfile.NamedTemporaryFile(delete=False, suffix=".svg") as tmpfile:
