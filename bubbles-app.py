@@ -367,7 +367,7 @@ with st.sidebar.expander("General Settings"):
     valid_color_schemes = [cmap_name for cmap_name in plt.colormaps() if hasattr(plt.get_cmap(cmap_name), 'colors')]
     COLOR_SCHEME = st.selectbox("Color Scheme", valid_color_schemes, index=valid_color_schemes.index('viridis'))
     COLORS = [mcolors.rgb2hex(color) for color in plt.get_cmap(COLOR_SCHEME).colors]
-    BACKGROUND_COLOR = st.text_input("Background Color", value="white")
+    BACKGROUND_COLOR = st.color_picker("Background Color", value="#fff")
 
 with st.sidebar.expander("General Animation Settings"):
     IS_ANIMATED = st.checkbox("Animated", value=True)
