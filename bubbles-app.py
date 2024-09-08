@@ -6,6 +6,7 @@ import matplotlib.colors as mcolors
 import colorsys
 import tempfile
 import numpy as np
+import math
 
 ################# UTILITIES #################
 def w(p):
@@ -81,6 +82,100 @@ def log_interpolation(start, end, n_steps):
     steps = np.exp(log_steps)
     
     return steps
+
+def generate_regular_points(center, number_of_points, radius=1):
+    """
+    Generate points evenly spaced around a center point.
+
+    Args:
+        center (tuple): A tuple (c_x, c_y) representing the center point.
+        number_of_points (int): The number of points to generate.
+        radius (float): The radius of the circle around the center. Default is 1.
+
+    Returns:
+        list: A list of tuples representing the coordinates of the points.
+    """
+    c_x, c_y = center
+    points = []
+    
+    for i in range(number_of_points):
+        angle = 2 * math.pi * i / number_of_points
+        x = c_x + radius * math.cos(angle)
+        y = c_y + radius * math.sin(angle)
+        points.append((x, y))
+    
+    return points
+
+def translate_point_radially(p, center, strength):
+    """
+    Translates point p radially outward from center by a factor of strength.
+
+    Args:
+        p (tuple): A tuple (p_x, p_y) representing the point to translate.
+        center (tuple): A tuple (center_x, center_y) representing the center point.
+        strength (float): The factor by which to scale the distance between p and center.
+
+    Returns:
+        tuple: A tuple (new_x, new_y) representing the new coordinates of the translated point.
+    """
+    p_x, p_y = p
+    center_x, center_y = center
+    
+    # Calculate the vector from the center to the point
+    delta_x = p_x - center_x
+    delta_y = p_y - center_y
+    
+    # Calculate the distance between the point and the center
+    distance = math.sqrt(delta_x**2 + delta_y**2)
+    
+    # Calculate the new distance based on the strength factor
+    new_distance = distance * (1 + strength)
+    
+    # Calculate the angle of the vector
+    angle = math.atan2(delta_y, delta_x)
+    
+    # Calculate new point coordinates by moving along the angle with the new distance
+    new_x = center_x + new_distance * math.cos(angle)
+    new_y = center_y + new_distance * math.sin(angle)
+    
+    return new_x, new_y
+
+def translate_point_tangentially(p, center, distance):
+    """
+    Translates point p tangentially around center by a given distance.
+
+    Args:
+        p (tuple): A tuple (p_x, p_y) representing the point to translate.
+        center (tuple): A tuple (center_x, center_y) representing the center point.
+        distance (float): The distance to move the point tangentially (positive for counter-clockwise, negative for clockwise).
+
+    Returns:
+        tuple: A tuple (new_x, new_y) representing the new coordinates of the translated point.
+    """
+    p_x, p_y = p
+    center_x, center_y = center
+    
+    # Calculate the vector from the center to the point
+    delta_x = p_x - center_x
+    delta_y = p_y - center_y
+    
+    # Calculate the current distance from the center (radius)
+    radius = math.sqrt(delta_x**2 + delta_y**2)
+    
+    # Calculate the current angle of the point relative to the center
+    current_angle = math.atan2(delta_y, delta_x)
+    
+    # Calculate the angular distance to move tangentially (arc length / radius)
+    angular_distance = distance / radius
+    
+    # Calculate the new angle
+    new_angle = current_angle + angular_distance
+    
+    # Calculate new point coordinates by moving along the circular path
+    new_x = center_x + radius * math.cos(new_angle)
+    new_y = center_y + radius * math.sin(new_angle)
+    
+    return new_x, new_y
 
 ################# GENERATION FUNCTIONS #################
 # NOTE: scope of variables in here is pretty horribly done...
@@ -326,6 +421,83 @@ def generate_waves(dwg):
     
     return dwg
 
+def generate_splotches(dwg):
+    # Define the shadow filter using feGaussianBlur and feOffset
+    if HAS_SHADOW: 
+        filter_element = dwg.filter(id="shadow")
+        filter_element.feGaussianBlur(in_="SourceAlpha", stdDeviation=SHADOW_BLURRINESS, result="blur")
+        filter_element.feOffset(in_="blur", dx=w(SHADOW_OFFSET_X), dy=w(SHADOW_OFFSET_Y), result="offsetBlur")
+        filter_element.feFlood(flood_color=SHADOW_COLOR, flood_opacity=SHADOW_OPACITY, result="floodShadow")  # Set a less intense shadow color
+        filter_element.feComposite(in_="floodShadow", in2="offsetBlur", operator="in", result="compositeShadow")
+    
+        dwg.defs.add(filter_element)
+    
+    for i in range(NUMBER_OF_SPLOTCHES):
+        # Define the center & size of the circle
+        c = (100 * random.random(), 100 * random.random())
+        r = (SPLOTCH_SIZE_MAX - SPLOTCH_SIZE_MIN) * random.random() + SPLOTCH_SIZE_MIN
+    
+        number_of_splotch_points = random.choice(range(NUMBER_OF_SPLOTCH_POINTS_MIN, NUMBER_OF_SPLOTCH_POINTS_MAX + 1))
+        
+        splotch_points_regular = generate_regular_points(c, number_of_splotch_points, r)
+        splotch_points = [translate_point_radially(translate_point_tangentially(p, c, SPLOTCH_POINT_SPACING_RANDOMNESS * (random.random() - 0.5)), c, SPLOTCH_POINT_RADIAL_RANDOMNESS * (random.random() - 0.5)) for p in splotch_points_regular]
+        
+        start_point_x, start_point_y = splotch_points[0]
+        from_path_data = f"M {w(start_point_x)},{h(start_point_y)}\n"
+        
+        for k, (p_x, p_y) in enumerate(splotch_points):
+            # find the previous and next points, wrapping around
+            p_prev = splotch_points[(k - 1) % len(splotch_points)]
+            p_next = splotch_points[(k + 1) % len(splotch_points)]
+            
+            # calculate control points for p
+            control_x, control_y = calculate_control(p_prev, (p_x, p_y), p_next, CONTROL_ARM_LENGTH)
+            
+            from_path_data += f"S {w(control_x)},{h(control_y)} {w(p_x)},{h(p_y)}\n"
+        
+        # add the first point again, to get a smooth closure
+        p_x, p_y = splotch_points[0]
+        p_prev = splotch_points[-1]
+        p_next = splotch_points[1]
+        control_x, control_y = calculate_control(p_prev, (p_x, p_y), p_next, CONTROL_ARM_LENGTH)
+        from_path_data += f"S {w(control_x)},{h(control_y)} {w(p_x)},{h(p_y)}\n"
+        
+        # close the path
+        from_path_data += "Z"
+        
+        # create the stripped path
+        from_path = from_path_data.replace('\n', ' ').strip()
+        to_path = from_path
+        fill_color = FILL_COLOR if SINGLE_COLOR else random.choice(COLORS)
+
+        splotch = dwg.path(d=from_path, fill=fill_color)
+        if HAS_SHADOW: splotch_shadow = dwg.path(d=from_path, fill="blue", filter="url(#shadow)")
+        
+        # NOTE: The animation only works if x and y coordinates in the path are comma separated, and points are space separated
+        # i.e. 'S 50 50, 20 20' doesn't work, but 'S 50,50 20,20' does... 
+        if IS_ANIMATED:
+            animation = dwg.animate(
+                attributeName="d",
+                dur=ANIMATION_DURATION,
+                repeatCount="indefinite" if REPEAT_ANIMATION else 1,
+                values=[from_path, to_path, from_path],
+                keyTimes="0;0.5;1",
+                calcMode="spline",
+                keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+            )
+            
+            splotch.add(animation)
+            if HAS_SHADOW: splotch_shadow.add(animation)
+        
+        if HAS_SHADOW: dwg.add(splotch_shadow)
+        dwg.add(splotch)
+        
+    if HAS_NOISE:
+        rect = dwg.rect(insert=(0, 0), size=(WIDTH, HEIGHT), fill=random.choice(COLORS), fill_opacity=0.2, filter="url(#noiseFilter)")
+        dwg.add(rect)
+    
+    return dwg
+
 ################# PRESET DEFINITION #################
 # define some re-usable modular preset parts
 preset_general_standard = {
@@ -399,6 +571,21 @@ preset_waves_standard = {
     "SHADOW_OPACITY": 0.2,
     "SHADOW_OFFSET_Y": 2.0,
     "ANIMATION_STRENGTH": 0.15,
+}
+
+preset_spotches_standard = {
+    "SINGLE_COLOR": False,
+    "FILL_COLOR": "#FF4800",
+    "HAS_NOISE": True,
+    "HAS_SHADOW": False,
+    "SHADOW_COLOR": "#000",
+    "SHADOW_BLURRINESS": 20,
+    "SHADOW_OPACITY": 0.2,
+    "SHADOW_OFFSET_X": 2.0,
+    "SHADOW_OFFSET_Y": 2.0,
+    "SPLOTCH_POINT_SPACING_RANDOMNESS": 1.0,
+    "SPLOTCH_POINT_RADIAL_RANDOMNESS": 0.9, 
+    "CONTROL_ARM_LENGTH": 0.2  
 }
 
 # define presets
@@ -564,7 +751,28 @@ presets_waves = [
     }
 ]
 
-presets = presets_bubbles + presets_filters + presets_waves
+presets_splotches = [
+    { 
+        "name": "Default Splotch",
+        "MODULE": "Splotches"
+    } | 
+    preset_general_standard | 
+    preset_animation_standard |
+    preset_spotches_standard |
+    {
+        "WIDTH": 900,
+        "SEED": 8,
+        "NUMBER_OF_SPLOTCHES": 5,
+        "NUMBER_OF_SPLOTCH_POINTS_MIN" : 5,
+        "NUMBER_OF_SPLOTCH_POINTS_MAX": 9,
+        "SPLOTCH_POINT_SPACING_RANDOMNESS": 1.0,
+        "SPLOTCH_POINT_RADIAL_RANDOMNESS": 0.6,
+        "CONTROL_ARM_LENGTH": 0.2
+    }
+]
+
+
+presets = presets_splotches + presets_bubbles + presets_filters + presets_waves
 
 ################# SIDEBAR CONFIGURATION #################
 # Streamlit inputs for configuration
@@ -677,7 +885,6 @@ if MODULE == "Waves":
             INVERT_FADE = st.checkbox("Invert Fade", value=sp.get("INVERT_FADE", False), help="INVERT_FADE")
             MIN_LUMINOSITY = st.number_input("Minimum Luminosity", min_value=0.0, max_value=1.0, value=sp.get("MIN_LUMINOSITY", 1.0), step=0.1, help="MIN_LUMINOSITY")
             MAX_LUMINOSITY = st.number_input("Maximum Luminosity", min_value=0.0, max_value=1.0, value=sp.get("MAX_LUMINOSITY", 0.2), step=0.1, help="MAX_LUMINOSITY")
-            st.divider()
             
     with st.sidebar.expander("Shadow Settings"):
         HAS_SHADOW = st.checkbox("Add Wave Shadow", value=sp.get("HAS_SHADOW", False), help="HAS_SHADOW")
@@ -692,6 +899,37 @@ if MODULE == "Waves":
     with st.sidebar.expander("Wave Animation Settings"):
         ANIMATION_STRENGTH = st.number_input("Animation Strength", value=sp.get("ANIMATION_STRENGTH", 0.15), min_value=0.0, step=0.05, help="ANIMATION_STRENGTH")
 
+if MODULE == "Splotches":
+    with st.sidebar.expander("Layout Settings"):
+        NUMBER_OF_SPLOTCHES = st.number_input("Number of Splotches", min_value=1, max_value=1000, value=sp.get("NUMBER_OF_SPLOTCHES", 20), step=1, help="NUMBER_OF_SPLOTCHES")
+
+    with st.sidebar.expander("Splotch Settings"):
+        SPLOTCH_SIZE_MIN = st.number_input("Minimum Size (relative to canvas width)", min_value=0.0, value=sp.get("SPLOTCH_SIZE_MIN", 5.0), step=1.0, help="SPLOTCH_SIZE_MIN")
+        SPLOTCH_SIZE_MAX = st.number_input("Maximum Size (relative to canvas width)", min_value=1.0, value=sp.get("SPLOTCH_SIZE_MAX", 30.0), step=1.0, help="SPLOTCH_SIZE_MAX")
+        st.divider()
+        NUMBER_OF_SPLOTCH_POINTS_MIN = st.number_input("Min number of Splotch Points", min_value=2, value=sp.get("NUMBER_OF_SPLOTCH_POINTS_MIN", 5), step=1, help="NUMBER_OF_SPLOTCH_POINTS_MIN")
+        NUMBER_OF_SPLOTCH_POINTS_MAX = st.number_input("Max number of Splotch Points", min_value=2, value=sp.get("NUMBER_OF_SPLOTCH_POINTS_MAX", 10), step=1, help="NUMBER_OF_SPLOTCH_POINTS_MAX")
+        st.divider()
+        SPLOTCH_POINT_SPACING_RANDOMNESS = st.number_input("Splotch Point Spacing Randomness", min_value=0.0, value=sp.get("SPLOTCH_POINT_SPACING_RANDOMNESS", 1.0), step=1.0, help="SPLOTCH_POINT_SPACING_RANDOMNESS")
+        SPLOTCH_POINT_RADIAL_RANDOMNESS = st.number_input("Splotch Point Radial Randomness", value=sp.get("SPLOTCH_POINT_RADIAL_RANDOMNESS", 5.0), step=0.1, help="SPLOTCH_POINT_RADIAL_RANDOMNESS")
+        CONTROL_ARM_LENGTH = st.number_input("Control Arm Length (Relative)", value=sp.get("CONTROL_ARM_LENGTH", 0.2), min_value=0.0, step=0.01, help="CONTROL_ARM_LENGTH")
+    
+    with st.sidebar.expander("Color Settings"):
+        SINGLE_COLOR = st.checkbox("Use Single Color", value=sp.get("SINGLE_COLOR", True), help="SINGLE_COLOR")
+        if (SINGLE_COLOR):
+            FILL_COLOR = st.color_picker("Choose Color", value=sp.get("FILL_COLOR", "#FF4800"), help="FILL_COLOR")
+        
+        HAS_NOISE = st.checkbox("Has Noise", value=sp.get("HAS_NOISE", True), help="HAS_NOISE")
+    
+    with st.sidebar.expander("Shadow Settings"):
+        HAS_SHADOW = st.checkbox("Add Wave Shadow", value=sp.get("HAS_SHADOW", False), help="HAS_SHADOW")
+        if HAS_SHADOW:
+            SHADOW_COLOR = st.color_picker("Shadow Color", complementary_color(FILL_COLOR) if SINGLE_COLOR and SHADOW_COLOR_COMPLEMENTARY else sp.get("SHADOW_COLOR", "#000"), help="SHADOW_COLOR")
+            SHADOW_BLURRINESS = st.number_input("Shadow Blurriness", value=sp.get("SHADOW_BLURRINESS", 20), min_value=0, step=1, help="SHADOW_BLURRINESS")
+            SHADOW_OPACITY = st.number_input("Shadow Opacity", min_value=0.0, max_value=1.0, value=sp.get("SHADOW_OPACITY", 0.2), step=0.05, help="SHADOW_OPACITY")
+            SHADOW_OFFSET_X = st.number_input("Shadow Offset X (relative to canvas width)", value=sp.get("SHADOW_OFFSET_X", 2.0), step=1.0, help="SHADOW_OFFSET_X")
+            SHADOW_OFFSET_Y = st.number_input("Shadow Offset Y (relative to canvas width)", value=sp.get("SHADOW_OFFSET_Y", 2.0), step=1.0, help="SHADOW_OFFSET_Y")
+
 ################# MAIN BODY #################
 # set up the drawing environment
 random.seed(SEED)
@@ -705,8 +943,8 @@ if HAS_BACKGROUND:
 if MODULE == "Bubbles": dwg = generate_bubbles(dwg)
 if MODULE == "Filters": dwg = generate_filters(dwg)
 if MODULE == "Waves": dwg = generate_waves(dwg)
+if MODULE == "Splotches": dwg = generate_splotches(dwg)
 if MODULE == "Radial Waves": st.info("Radial waves coming soon!") # TODO
-if MODULE == "Splotches": st.info("Splotches coming soon!") # TODO
 
 # Display output as an image
 with tempfile.NamedTemporaryFile(delete=False, suffix=".svg") as tmpfile:
