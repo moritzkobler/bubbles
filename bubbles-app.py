@@ -99,14 +99,10 @@ def generate_bubbles(dwg):
     # Generate the bubbles
     for i in range(NUMBER_OF_BUBBLES):
         # Define the center & size of the circle
-        x = 100 * random.random()
-        y = 100 * random.random()
-        
-        min_r = 5
-        max_r = 30
-        r = (max_r - min_r) * random.random() + min_r
-        
-        base_color = random.choice(COLORS)
+        x = 120 * random.random() - 10
+        y = 120 * random.random() - 10
+        r = (MAX_RADIUS - MIN_RADIUS) * random.random() + MIN_RADIUS
+        base_color = FILL_COLOR if SINGLE_COLOR else random.choice(COLORS)
         
         # Define a linear gradient
         gradient_id = f"gradient-{i}"
@@ -115,28 +111,38 @@ def generate_bubbles(dwg):
         linear_gradient.add_stop_color(1, base_color, 0.1)
         dwg.defs.add(linear_gradient)
         
+        fill_color = f'url(#{gradient_id})' if HAS_GRADIENT else base_color
+        
         # Define the circle itself
-        circle = dwg.circle(center=(w(x), h(y)), r=w(r), fill=f'url(#{gradient_id})')
+        circle = dwg.circle(center=(w(x), h(y)), r=w(r), fill=fill_color)
         if IS_DISTORTED:
             circle.attribs['filter'] = "url(#distortFilter)"
         
         if IS_ANIMATED:
-            min_speed = 4
-            max_speed = 20
-            speed = (max_speed - min_speed) * random.random() + min_speed
-            
-            animate = dwg.animate(
-                attributeName="cy",
-                from_=h(y),
-                to=h(y) - h(speed),
-                dur="20s",
+            distance_x = (MAX_X_DISTANCE_PERC - MIN_X_DISTANCE_PERC) * random.random() + MIN_X_DISTANCE_PERC
+            animate_x = dwg.animate(
+                attributeName="cx",
+                dur=ANIMATION_DURATION,
                 repeatCount="indefinite" if REPEAT_ANIMATION else 1,
-                values=[h(y), h(y) - h(speed), h(y)],
+                values=[w(x), w(x) + w(distance_x), w(x)],
                 keyTimes="0;0.5;1",
                 calcMode="spline",
                 keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
             )
-            circle.add(animate)
+            
+            distance_y = (MAX_Y_DISTANCE_PERC - MIN_Y_DISTANCE_PERC) * random.random() + MIN_X_DISTANCE_PERC
+            animate_y = dwg.animate(
+                attributeName="cy",
+                dur=ANIMATION_DURATION,
+                repeatCount="indefinite" if REPEAT_ANIMATION else 1,
+                values=[h(y), h(y) - h(distance_y), h(y)],
+                keyTimes="0;0.5;1",
+                calcMode="spline",
+                keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+            )
+            
+            circle.add(animate_x)
+            circle.add(animate_y)
         
         dwg.add(circle)
 
@@ -321,10 +327,12 @@ def generate_waves(dwg):
     return dwg
 
 ################# PRESET DEFINITION #################
+# define some re-usable modular preset parts
 preset_general_standard = {
     "WIDTH": 600,
     "HEIGHT": 900,
     "COLOR_SCHEME": "viridis",
+    "HAS_BACKGROUND": True,
     "BACKGROUND_COLOR": "#fff",
 }
 
@@ -351,33 +359,212 @@ preset_filters_standard = {
     "MAX_Z": 500.0,
 }
 
-presets = [
+preset_bubbles_standard = {
+    "NUMBER_OF_BUBBLES": 20,
+    "IS_DISTORTED": True,
+    "HAS_NOISE": True,
+    "MIN_RADIUS": 5.0,
+    "MAX_RADIUS": 30.0,
+    "HAS_GRADIENT": True,
+    "SINGLE_COLOR": False,
+    "MIN_X_DISTANCE_PERC": 0.0,
+    "MAX_X_DISTANCE_PERC": 0.0,
+    "MIN_Y_DISTANCE_PERC": 4.0,
+    "MAX_Y_DISTANCE_PERC": 20.0,
+}
+
+preset_waves_standard = {
+    "NUMBER_OF_WAVES": 30,
+    "HORIZON_Y": 15.0,
+    "LAST_WAVE_Y": 80.0,
+    "SPACING_TYPE": "Logarithmic",
+    "WAVE_SPACING_RANDOMNESS": 0.0,
+    "NUMBER_OF_WAVE_POINTS_MIN": 2,
+    "NUMBER_OF_WAVE_POINTS_MAX": 6,
+    "WAVE_HEIGHT_FACTOR": 15.0,
+    "FIRST_POINT_START_MAX": 0.0,
+    "WAVE_POINT_SPACING_RANDOMNESS": 0.0,
+    "CONTROL_ARM_LENGTH": 0.2,
+    "SINGLE_COLOR": True,
+    "FILL_COLOR": "#FF4800",
+    "HAS_NOISE": True,
+    "ADD_FADING_EFFECT": True,
+    "INVERT_FADE": False,
+    "MIN_LUMINOSITY": 1.0,
+    "MAX_LUMINOSITY": 0.2,
+    "HAS_SHADOW": False,
+    "SHADOW_COLOR_COMPLEMENTARY": False,
+    "SHADOW_COLOR": "#000",
+    "SHADOW_BLURRINESS": 20,
+    "SHADOW_OPACITY": 0.2,
+    "SHADOW_OFFSET_Y": 2.0,
+    "ANIMATION_STRENGTH": 0.15,
+}
+
+# define presets
+presets_bubbles = [
+    { 
+        "name": "Distorted Bubbles",
+        "MODULE": "Bubbles"
+    } | 
+    preset_general_standard | 
+    preset_animation_standard | 
+    preset_bubbles_standard |
+    {
+        "ANIMATION_DURATION_INPUT": 15.0
+    },
+    
+    ###
+    { 
+        "name": "Many Large Bubbles",
+        "MODULE": "Bubbles"
+    } | 
+    preset_general_standard | 
+    preset_animation_standard | 
+    preset_bubbles_standard |
+    { 
+        "ANIMATION_DURATION_INPUT": 15.0,
+        "NUMBER_OF_BUBBLES": 200,
+        "IS_DISTORTED": False
+    },
+    
+    ###
+    { 
+        "name": "Many Small Bubbles",
+        "MODULE": "Bubbles"
+    } | 
+    preset_general_standard | 
+    preset_animation_standard | 
+    preset_bubbles_standard |
+    { 
+        "ANIMATION_DURATION_INPUT": 20.0,
+        "NUMBER_OF_BUBBLES": 1000,
+        "IS_DISTORTED": False,
+        "MIN_RADIUS": 0.2,
+        "MAX_RADIUS": 2.0,
+        "MIN_X_DISTANCE_PERC": 10.0,
+        "MAX_X_DISTANCE_PERC": 20.0,
+        "MIN_Y_DISTANCE_PERC": 10.0,
+        "MAX_Y_DISTANCE_PERC": 20.0,
+    },
+    
+    ###
+    { 
+        "name": "Agressive Bubbles",
+        "MODULE": "Bubbles"
+    } | 
+    preset_general_standard | 
+    preset_animation_standard | 
+    preset_bubbles_standard |
+    {
+        "BACKGROUND_COLOR": "#A41919",
+        "ANIMATION_DURATION_INPUT": 20.0,
+        "NUMBER_OF_BUBBLES": 1000,
+        "IS_DISTORTED": False,
+        "SINGLE_COLOR": True,
+        "FILL_COLOR": "#3EFF00",
+        "MIN_RADIUS": 0.2,
+        "MAX_RADIUS": 2.0,
+        "MIN_X_DISTANCE_PERC": 10.0,
+        "MAX_X_DISTANCE_PERC": 20.0,
+        "MIN_Y_DISTANCE_PERC": 10.0,
+        "MAX_Y_DISTANCE_PERC": 20.0,
+    },
+]
+        
+presets_filters = [
     { 
         "name": "Standard Filters Piece",
         "MODULE": "Filters"
     } | 
-    { **preset_general_standard, "HEIGHT": 600} | 
+    preset_general_standard | 
     preset_animation_standard | 
-    preset_filters_standard,
+    preset_filters_standard |
+    { "HEIGHT": 600 },
     
-    #########
+    ###
     { 
         "name": "Turbulent Filter",
         "MODULE": "Filters"
     } | 
-    { **preset_general_standard, "HEIGHT": 600} | 
+    preset_general_standard | 
     preset_animation_standard | 
-    { **preset_filters_standard, "TEXTURE_TYPE": "turbulence" },
+    preset_filters_standard |
+    {
+        "HEIGHT": 600,
+        "TEXTURE_TYPE": "turbulence"
+    },
     
-    #########
+    ###
     { 
         "name": "Square Filter",
         "MODULE": "Filters"
     } | 
-    { **preset_general_standard, "HEIGHT": 600} | 
+    preset_general_standard | 
     preset_animation_standard | 
-    { **preset_filters_standard, "SHAPE": "Square", "FILL_COLOR": "#83CAD0" }
+    preset_filters_standard |
+    {
+        "HEIGHT": 600,
+        "ANIMATION_DURATION_INPUT": 10.0,
+        "SHAPE": "Square",
+        "FILL_COLOR": "#83CAD0",
+        "MIN_X_PERC": 10.0,
+        "MAX_X_PERC": 90.0,
+        "MIN_Y_PERC": 10.0,
+        "MAX_Y_PERC": 90.0,
+    }
 ]
+
+presets_waves = [
+    { 
+        "name": "Monochrome Waves",
+        "MODULE": "Waves"
+    } | 
+    preset_general_standard | 
+    preset_animation_standard | 
+    preset_waves_standard,
+    
+    ###
+    { 
+        "name": "Many-Colored Waves",
+        "MODULE": "Waves"
+    } | 
+    preset_general_standard | 
+    preset_animation_standard | 
+    preset_waves_standard |
+    {
+        "SEED": 5,
+        "HORIZON_Y": 15.0,
+        "SINGLE_COLOR": False,
+        "ADD_FADING_EFFECT": False,
+        "ANIMATION_STRENGTH": 0.05,
+        "HAS_SHADOW": True,
+        "SHADOW_OPACITY": 0.1,        
+    },
+    
+    ###
+    { 
+        "name": "Crazy Waves",
+        "MODULE": "Waves"
+    } | 
+    preset_general_standard | 
+    preset_animation_standard | 
+    preset_waves_standard |
+    {
+        "HORIZON_Y": -15.0,
+        "LAST_WAVE_Y": 120.0,
+        "SINGLE_COLOR": False,
+        "SPACING_TYPE": "Linear",
+        "ADD_FADING_EFFECT": False,
+        "ANIMATION_STRENGTH": 0.2,
+        "HAS_SHADOW": True,
+        "SHADOW_OPACITY": 0.1,
+        "NUMBER_OF_WAVE_POINTS_MIN": 30,
+        "NUMBER_OF_WAVE_POINTS_MAX": 50        
+    }
+]
+
+presets = presets_bubbles + presets_filters + presets_waves
 
 ################# SIDEBAR CONFIGURATION #################
 # Streamlit inputs for configuration
@@ -387,116 +574,133 @@ PRESET = st.sidebar.selectbox("Choose Preset", preset_names)
 sp = next(preset for preset in presets if preset["name"] == PRESET) # selected preset
 
 st.sidebar.header("General Settings")
-SEED = st.sidebar.number_input("Random Seed", value=3)
+SEED = st.sidebar.number_input("Random Seed", value = sp.get("SEED", 3), help="SEED")
 with st.sidebar.expander("General Settings"):
-    WIDTH = st.number_input("Width", value=sp.get("WIDTH", 600), step=1)
-    HEIGHT = st.number_input("Height", value=sp.get("HEIGHT", 600), step=1)
+    WIDTH = st.number_input("Width", value=sp.get("WIDTH", 600), step=1, help="WIDTH")
+    HEIGHT = st.number_input("Height", value=sp.get("HEIGHT", 600), step=1, help="HEIGHT")
     valid_color_schemes = [cmap_name for cmap_name in plt.colormaps() if hasattr(plt.get_cmap(cmap_name), 'colors')]
-    COLOR_SCHEME = st.selectbox("Color Scheme", valid_color_schemes, index=valid_color_schemes.index(sp.get("COLOR_SCHEME", 600)))
+    COLOR_SCHEME = st.selectbox("Color Scheme", valid_color_schemes, index=valid_color_schemes.index(sp.get("COLOR_SCHEME", 600)), help="COLOR_SCHEME")
     COLORS = [mcolors.rgb2hex(color) for color in plt.get_cmap(COLOR_SCHEME).colors]
-    BACKGROUND_COLOR = st.color_picker("Background Color", value=sp.get("BACKGROUND_COLOR", 600))
+    HAS_BACKGROUND = st.checkbox("Add Background", value=sp.get("HAS_BACKGROUND", True), help="HAS_BACKGROUND")
+    if HAS_BACKGROUND:
+        BACKGROUND_COLOR = st.color_picker("Background Color", value=sp.get("BACKGROUND_COLOR", 600), help="BACKGROUND_COLOR")
 
 with st.sidebar.expander("General Animation Settings"):
-    IS_ANIMATED = st.checkbox("Animated", value=sp.get("IS_ANIMATED", True))
-    REPEAT_ANIMATION = st.checkbox("Repeat Animation", value=sp.get("REPEAT_ANIMATION", True))
-    ANIMATION_DURATION_INPUT = st.number_input("Animation Duration in s", value=sp.get("ANIMATION_DURATION_INPUT", 5.0), step=0.1)
+    IS_ANIMATED = st.checkbox("Animated", value=sp.get("IS_ANIMATED", True), help="IS_ANIMATED")
+    REPEAT_ANIMATION = st.checkbox("Repeat Animation", value=sp.get("REPEAT_ANIMATION", True), help="REPEAT_ANIMATION")
+    ANIMATION_DURATION_INPUT = st.number_input("Animation Duration in s", value=sp.get("ANIMATION_DURATION_INPUT", 5.0), step=0.1, help="ANIMATION_DURATION_INPUT")
     ANIMATION_DURATION = f"{ANIMATION_DURATION_INPUT}s"
 
 st.sidebar.header("Type Settings")
 modules = ["Bubbles", "Filters", "Waves", "Radial Waves", "Splotches"]
-MODULE = st.sidebar.selectbox("Type of Graphic", modules, index=modules.index(sp.get("MODULE", "Waves")))
-# TODO: 1) clean up the filters to have the general settings actually apply to everything (check animation...),
-# and 2) rework the animation in bubbles to actually use the animation duration setting (+ another setting prbably) 
-# rather than the weird speed construct...
+MODULE = st.sidebar.selectbox("Type of Graphic", modules, index=modules.index(sp.get("MODULE", "Waves")), help="MODULE")
 if MODULE == "Bubbles":
-    NUMBER_OF_BUBBLES = st.sidebar.number_input("Number of Bubbles", min_value=1, max_value=1000, value=20, step=1)
-    IS_DISTORTED = st.sidebar.checkbox("Distorted", value=True)
-    HAS_NOISE = st.sidebar.checkbox("Has Noise", value=False)
+    with st.sidebar.expander("General Bubble Settings"):
+        NUMBER_OF_BUBBLES = st.number_input("Number of Bubbles", min_value=1, max_value=1000, value=sp.get("NUMBER_OF_BUBBLES", 20), step=1, help="NUMBER_OF_BUBBLES")
+        IS_DISTORTED = st.checkbox("Distorted", value=sp.get("IS_DISTORTED", True), help="IS_DISTORTED")
+        HAS_NOISE = st.checkbox("Has Noise", value=sp.get("HAS_NOISE", False), help="HAS_NOISE")
+        
+    with st.sidebar.expander("Bubble Settings"):
+        MIN_RADIUS = st.number_input("Minimum Radius (relative to canvas width)", min_value=0.0, value=sp.get("MIN_RADIUS", 5.0), step=1.0, help="MIN_RADIUS")
+        MAX_RADIUS = st.number_input("Maximum Radius (relative to canvas width)", min_value=1.0, value=sp.get("MAX_RADIUS", 30.0), step=1.0, help="MAX_RADIUS")
+    
+    with st.sidebar.expander("Color Settings"):
+        HAS_GRADIENT = st.checkbox("Add Gradient", value=sp.get("HAS_GRADIENT", True), help="HAS_GRADIENT")
+        SINGLE_COLOR = st.checkbox("Use Single Color", value=sp.get("SINGLE_COLOR", False), help="SINGLE_COLOR")
+        if (SINGLE_COLOR):
+            FILL_COLOR = st.color_picker("Choose Color", value=sp.get("FILL_COLOR", "#D412BC"), help="FILL_COLOR")
+
+    with st.sidebar.expander("Bubble Animation Settings"):        
+        MIN_X_DISTANCE_PERC = st.number_input("Min x distance (relative to canvas width)", value=sp.get("MIN_X_DISTANCE_PERC", 0.0), step=1.0, help="MIN_X_DISTANCE_PERC")
+        MAX_X_DISTANCE_PERC = st.number_input("Max x distance (relative to canvas width)", value=sp.get("MAX_X_DISTANCE_PERC", 0.0), step=1.0, help="MAX_X_DISTANCE_PERC")
+        st.divider()
+        MIN_Y_DISTANCE_PERC = st.number_input("Min y distance (relative to canvas height)", value=sp.get("MIN_Y_DISTANCE_PERC", 4.0), step=1.0, help="MIN_Y_DISTANCE_PERC")
+        MAX_Y_DISTANCE_PERC = st.number_input("Max y distance (relative to canvas height)", value=sp.get("MAX_Y_DISTANCE_PERC", 20.0), step=1.0, help="MAX_Y_DISTANCE_PERC")
+
 if MODULE == "Filters":
     with st.sidebar.expander("Shape Settings"):
         shapes = ["Square", "Circle"]
-        SHAPE = st.selectbox("Shape", shapes, index=shapes.index(sp.get("SHAPE", "Circle")))
-        SHAPE_DIMENSIONS = st.number_input("Shape Dimensions (relative to canvas width)", value=sp.get("SHAPE_DIMENSIONS", 80.0), step=1.0)
-        
+        SHAPE = st.selectbox("Shape", shapes, index=shapes.index(sp.get("SHAPE", "Circle")), help="SHAPE")
+        SHAPE_DIMENSIONS = st.number_input("Shape Dimensions (relative to canvas width)", value=sp.get("SHAPE_DIMENSIONS", 80.0), step=1.0, help="SHAPE_DIMENSIONS")
         
     with st.sidebar.expander("Texture Settings"):
         texture_types = ["fractalNoise", "turbulence"]
-        TEXTURE_TYPE = st.selectbox("Color Scheme", texture_types, index=texture_types.index(sp.get("TEXTURE_TYPE", "fractalNoise")))
-        BASE_FREQUENCY = st.number_input("Base Frequency", value=sp.get("BASE_FREQUENCY", 0.05), step=0.1)
-        NUM_OCTAVES = st.number_input("Number of Octaves", value=sp.get("NUM_OCTAVES", 20), step=1)
+        TEXTURE_TYPE = st.selectbox("Color Scheme", texture_types, index=texture_types.index(sp.get("TEXTURE_TYPE", "fractalNoise")), help="TEXTURE_TYPE")
+        BASE_FREQUENCY = st.number_input("Base Frequency", value=sp.get("BASE_FREQUENCY", 0.05), step=0.1, help="BASE_FREQUENCY")
+        NUM_OCTAVES = st.number_input("Number of Octaves", value=sp.get("NUM_OCTAVES", 20), step=1, help="NUM_OCTAVES")
     
     with st.sidebar.expander("Color Settings"):
-        SINGLE_COLOR = st.checkbox("Use Single Color", value=sp.get("SINGLE_COLOR", True))
+        SINGLE_COLOR = st.checkbox("Use Single Color", value=sp.get("SINGLE_COLOR", True), help="SINGLE_COLOR")
         if (SINGLE_COLOR):
-            FILL_COLOR = st.color_picker("Choose Color", value=sp.get("FILL_COLOR", "#D412BC"))
+            FILL_COLOR = st.color_picker("Choose Color", value=sp.get("FILL_COLOR", "#D412BC"), help="FILL_COLOR")
     
     with st.sidebar.expander("Lighting Settings"):
-        SURFACE_SCALE = st.number_input("Surface Scale", value=sp.get("SURFACE_SCALE", 20.0), step=1.0)
-        DIFFUSE_CONSTANT = st.number_input("Diffuse Constant", value=sp.get("DIFFUSE_CONSTANT", 1.0), step=1.0)
-        LIGHTING_COLOR_INPUT = st.color_picker("Lighting Color", value=sp.get("LIGHTING_COLOR_INPUT", "#fff"))
+        SURFACE_SCALE = st.number_input("Surface Scale", value=sp.get("SURFACE_SCALE", 20.0), step=1.0, help="SURFACE_SCALE")
+        DIFFUSE_CONSTANT = st.number_input("Diffuse Constant", value=sp.get("DIFFUSE_CONSTANT", 1.0), step=1.0, help="DIFFUSE_CONSTANT")
+        LIGHTING_COLOR_INPUT = st.color_picker("Lighting Color", value=sp.get("LIGHTING_COLOR_INPUT", "#fff"), help="LIGHTING_COLOR_INPUT")
         
     with st.sidebar.expander("Filter Animation Settings"):        
-        MIN_X_PERC = st.number_input("min x (relative to canvas width)", value=sp.get("MIN_X_PERC", 10.0), step=1.0)
-        MAX_X_PERC = st.number_input("max x (relative to canvas width)", value=sp.get("MAX_X_PERC", 90.0), step=1.0)
+        MIN_X_PERC = st.number_input("min x (relative to canvas width)", value=sp.get("MIN_X_PERC", 10.0), step=1.0, help="MIN_X_PERC")
+        MAX_X_PERC = st.number_input("max x (relative to canvas width)", value=sp.get("MAX_X_PERC", 90.0), step=1.0, help="MAX_X_PERC")
         st.divider()
-        MIN_Y_PERC = st.number_input("min y (relative to canvas width)", value=sp.get("MIN_Y_PERC", 10.0), step=1.0)
-        MAX_Y_PERC = st.number_input("max y (relative to canvas width)", value=sp.get("MAX_Y_PERC", 10.0), step=1.0)
+        MIN_Y_PERC = st.number_input("min y (relative to canvas width)", value=sp.get("MIN_Y_PERC", 10.0), step=1.0, help="MIN_Y_PERC")
+        MAX_Y_PERC = st.number_input("max y (relative to canvas width)", value=sp.get("MAX_Y_PERC", 10.0), step=1.0, help="MAX_Y_PERC")
         st.divider()
-        MIN_Z = st.number_input("min z", value=sp.get("MIN_Z", 5.0), step=1.0)
-        MAX_Z = st.number_input("max z", value=sp.get("MAX_Z", 500.0), step=1.0)    
+        MIN_Z = st.number_input("min z", value=sp.get("MIN_Z", 5.0), step=1.0, help="MIN_Z")
+        MAX_Z = st.number_input("max z", value=sp.get("MAX_Z", 500.0), step=1.0, help="MAX_Z")    
+
 if MODULE == "Waves":
     with st.sidebar.expander("Layout Settings"):
-        NUMBER_OF_WAVES = st.number_input("Number of Waves", min_value=1, max_value=1000, value=30, step=1)
-        HORIZON_Y = st.number_input("Horizon Position", value=15.0, step=1.0)
-        LAST_WAVE_Y = st.number_input("Last Wave", value=80.0, step=1.0)
-        SPACING_TYPE = st.selectbox("Spacing Type", ["Linear", "Logarithmic"], index=1)
-        WAVE_SPACING_RANDOMNESS = st.number_input("Wave Spacing Randomness", value=0.0, min_value=0.0, max_value=1.0, step=0.05)
+        NUMBER_OF_WAVES = st.number_input("Number of Waves", min_value=1, max_value=1000, value=sp.get("NUMBER_OF_WAVES", 30), step=1, help="NUMBER_OF_WAVES")
+        HORIZON_Y = st.number_input("Horizon Position", value=sp.get("HORIZON_Y", 15.0), step=1.0, help="HORIZON_Y")
+        LAST_WAVE_Y = st.number_input("Last Wave", value=sp.get("LAST_WAVE_Y", 80.0), step=1.0, help="LAST_WAVE_Y")
+        spacing_types = ["Linear", "Logarithmic"]
+        SPACING_TYPE = st.selectbox("Spacing Type", spacing_types, index=spacing_types.index(sp.get("SPACING_TYPE", "Logarithmic")), help="SPACING_TYPE")
+        WAVE_SPACING_RANDOMNESS = st.number_input("Wave Spacing Randomness", value=sp.get("WAVE_SPACING_RANDOMNESS", 0.0), min_value=0.0, max_value=1.0, step=0.05, help="WAVE_SPACING_RANDOMNESS")
     
     with st.sidebar.expander("Wave Settings"):
-        NUMBER_OF_WAVE_POINTS_MIN = st.number_input("Min number of Wave Points", min_value=1, value=2, step=1)
-        NUMBER_OF_WAVE_POINTS_MAX = st.number_input("Max number of Wave Points", min_value=1, value=6, step=1)
-        WAVE_HEIGHT_FACTOR = st.number_input("Wave Height Indicator", value=15.0, step=1.0)
-        FIRST_POINT_START_MAX = st.number_input("Max First Point Start", value=0.0, step=1.0)
-        WAVE_POINT_SPACING_RANDOMNESS = st.number_input("Point Spacing Randomness", value=0.0, min_value=0.0, max_value=1.0, step=0.05)
-        CONTROL_ARM_LENGTH = st.number_input("Control Arm Length (Relative)", value=0.2, min_value=0.0, step=0.01)
+        NUMBER_OF_WAVE_POINTS_MIN = st.number_input("Min number of Wave Points", min_value=1, value=sp.get("NUMBER_OF_WAVE_POINTS_MIN", 2), step=1, help="NUMBER_OF_WAVE_POINTS_MIN")
+        NUMBER_OF_WAVE_POINTS_MAX = st.number_input("Max number of Wave Points", min_value=1, value=sp.get("NUMBER_OF_WAVE_POINTS_MAX", 6), step=1, help="NUMBER_OF_WAVE_POINTS_MAX")
+        WAVE_HEIGHT_FACTOR = st.number_input("Wave Height Indicator", value=sp.get("WAVE_HEIGHT_FACTOR", 15.0), step=1.0, help="WAVE_HEIGHT_FACTOR")
+        FIRST_POINT_START_MAX = st.number_input("Max First Point Start", value=sp.get("FIRST_POINT_START_MAX", 0.0), step=1.0, help="FIRST_POINT_START_MAX")
+        WAVE_POINT_SPACING_RANDOMNESS = st.number_input("Point Spacing Randomness", value=sp.get("WAVE_POINT_SPACING_RANDOMNESS", 0.0), min_value=0.0, max_value=1.0, step=0.05, help="WAVE_POINT_SPACING_RANDOMNESS")
+        CONTROL_ARM_LENGTH = st.number_input("Control Arm Length (Relative)", value=sp.get("CONTROL_ARM_LENGTH", 0.2), min_value=0.0, step=0.01, help="CONTROL_ARM_LENGTH")
         
     with st.sidebar.expander("Color Settings"):
-        SINGLE_COLOR = st.checkbox("Use Single Color", value=True)
+        SINGLE_COLOR = st.checkbox("Use Single Color", value=sp.get("SINGLE_COLOR", True), help="SINGLE_COLOR")
         if (SINGLE_COLOR):
-            FILL_COLOR = st.color_picker("Choose Color", value="#FF4800")
+            FILL_COLOR = st.color_picker("Choose Color", value=sp.get("FILL_COLOR", "#FF4800"), help="FILL_COLOR")
         
-        HAS_NOISE = st.checkbox("Has Noise", value=True)
-        ADD_FADING_EFFECT = st.checkbox("Add Fade", value=True)
+        HAS_NOISE = st.checkbox("Has Noise", value=sp.get("HAS_NOISE", True), help="HAS_NOISE")
+        ADD_FADING_EFFECT = st.checkbox("Add Fade", value=sp.get("ADD_FADING_EFFECT", True), help="ADD_FADING_EFFECT")
         if ADD_FADING_EFFECT:
-            INVERT_FADE = st.checkbox("Invert Fade", value=False)
-            MIN_LUMINOSITY = st.number_input("Minimum Luminosity", min_value=0.0, max_value=1.0, value=1.0, step=0.1)
-            MAX_LUMINOSITY = st.number_input("Maximum Luminosity", min_value=0.0, max_value=1.0, value=0.2, step=0.1)
+            INVERT_FADE = st.checkbox("Invert Fade", value=sp.get("INVERT_FADE", False), help="INVERT_FADE")
+            MIN_LUMINOSITY = st.number_input("Minimum Luminosity", min_value=0.0, max_value=1.0, value=sp.get("MIN_LUMINOSITY", 1.0), step=0.1, help="MIN_LUMINOSITY")
+            MAX_LUMINOSITY = st.number_input("Maximum Luminosity", min_value=0.0, max_value=1.0, value=sp.get("MAX_LUMINOSITY", 0.2), step=0.1, help="MAX_LUMINOSITY")
             st.divider()
             
     with st.sidebar.expander("Shadow Settings"):
-        HAS_SHADOW = st.checkbox("Add Wave Shadow", value=False)
+        HAS_SHADOW = st.checkbox("Add Wave Shadow", value=sp.get("HAS_SHADOW", False), help="HAS_SHADOW")
         if HAS_SHADOW:
             if SINGLE_COLOR:
-                SHADOW_COLOR_COMPLEMENTARY = st.checkbox("Complementary Color", value=False)
-            SHADOW_COLOR = st.color_picker("Shadow Color", complementary_color(FILL_COLOR) if SINGLE_COLOR and SHADOW_COLOR_COMPLEMENTARY else "#000")
-            SHADOW_BLURRINESS = st.number_input("Shadow Blurriness", value=20, min_value=0, step=1)
-            SHADOW_OPACITY = st.number_input("Shadow Opacity", min_value=0.0, max_value=1.0, value=0.2, step=0.05)
-            SHADOW_OFFSET_Y = st.number_input("Shadow Offset (relative, negative)", value=2.0, step=0.1)
+                SHADOW_COLOR_COMPLEMENTARY = st.checkbox("Complementary Color", value=sp.get("SHADOW_COLOR_COMPLEMENTARY", False), help="SHADOW_COLOR_COMPLEMENTARY")
+            SHADOW_COLOR = st.color_picker("Shadow Color", complementary_color(FILL_COLOR) if SINGLE_COLOR and SHADOW_COLOR_COMPLEMENTARY else sp.get("SHADOW_COLOR", "#000"), help="SHADOW_COLOR")
+            SHADOW_BLURRINESS = st.number_input("Shadow Blurriness", value=sp.get("SHADOW_BLURRINESS", 20), min_value=0, step=1, help="SHADOW_BLURRINESS")
+            SHADOW_OPACITY = st.number_input("Shadow Opacity", min_value=0.0, max_value=1.0, value=sp.get("SHADOW_OPACITY", 0.2), step=0.05, help="SHADOW_OPACITY")
+            SHADOW_OFFSET_Y = st.number_input("Shadow Offset (relative, negative)", value=sp.get("SHADOW_OFFSET_Y", 2.0), step=1.0, help="SHADOW_OFFSET_Y")
     
     with st.sidebar.expander("Wave Animation Settings"):
-        ANIMATION_STRENGTH = st.number_input("Animation Strength", value=0.15, min_value=0.0, step=0.05)
+        ANIMATION_STRENGTH = st.number_input("Animation Strength", value=sp.get("ANIMATION_STRENGTH", 0.15), min_value=0.0, step=0.05, help="ANIMATION_STRENGTH")
+
 ################# MAIN BODY #################
 # set up the drawing environment
 random.seed(SEED)
 dwg = svgwrite.Drawing(size=(WIDTH, HEIGHT))
 
 # add the default background 
-if BACKGROUND_COLOR.strip().lower() != "" and BACKGROUND_COLOR.strip().lower() != "transparent":
-    try:
-        bg_rect = dwg.rect(insert=(0, 0), size=(WIDTH, HEIGHT), fill=BACKGROUND_COLOR.strip().lower())
-        dwg.add(bg_rect)
-    except TypeError:
-        st.warning(f'"{BACKGROUND_COLOR.strip().lower()}" is not a valid background color. Try a hex code or the usual string colors that are allowed. Leave it blank if you want a transparent background')
+if HAS_BACKGROUND:
+    bg_rect = dwg.rect(insert=(0, 0), size=(WIDTH, HEIGHT), fill=BACKGROUND_COLOR.strip().lower())
+    dwg.add(bg_rect)
 
 if MODULE == "Bubbles": dwg = generate_bubbles(dwg)
 if MODULE == "Filters": dwg = generate_filters(dwg)
