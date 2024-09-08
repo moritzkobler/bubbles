@@ -149,21 +149,18 @@ def generate_bubbles(dwg):
 
 def generate_filters(dwg):
     ######## filter definitions ########
-    try:
-        ### textured filter ###
-        filter_textured = dwg.defs.add(dwg.filter(id='filterTextured'))
-        filter_textured.feTurbulence(type=TEXTURE_TYPE, baseFrequency=BASE_FREQUENCY, numOctaves=NUM_OCTAVES, result="turbulence")
-        point_light = filter_textured.feDiffuseLighting(
-            in_="turbulence",
-            surfaceScale=SURFACE_SCALE, 
-            diffuseConstant=DIFFUSE_CONSTANT,
-            lighting_color=LIGHTING_COLOR_INPUT.strip().lower(),
-            result="highlight"
-        ).fePointLight(source=(w(MIN_X_PERC), h(MIN_Y_PERC), MIN_Z))
-        filter_textured.feComposite(operator="in", in_="highlight", in2="SourceAlpha", result="highlightApplied")
-        filter_textured.feBlend(in_="SourceGraphic", in2="highlightApplied", mode="multiply")
-    except TypeError:
-        st.warning(f'"{LIGHTING_COLOR_INPUT.strip().lower()}" is not a valid lighting color. Try a hex code or the usual string colors that are allowed. Leave it blank if you want a transparent background')
+    ### textured filter ###
+    filter_textured = dwg.defs.add(dwg.filter(id='filterTextured'))
+    filter_textured.feTurbulence(type=TEXTURE_TYPE, baseFrequency=BASE_FREQUENCY, numOctaves=NUM_OCTAVES, result="turbulence")
+    point_light = filter_textured.feDiffuseLighting(
+        in_="turbulence",
+        surfaceScale=SURFACE_SCALE, 
+        diffuseConstant=DIFFUSE_CONSTANT,
+        lighting_color=LIGHTING_COLOR_INPUT.strip().lower(),
+        result="highlight"
+    ).fePointLight(source=(w(MIN_X_PERC), h(MIN_Y_PERC), MIN_Z))
+    filter_textured.feComposite(operator="in", in_="highlight", in2="SourceAlpha", result="highlightApplied")
+    filter_textured.feBlend(in_="SourceGraphic", in2="highlightApplied", mode="multiply")
 
     if IS_ANIMATED:
         animation_x = dwg.animate(
@@ -209,8 +206,14 @@ def generate_filters(dwg):
         dwg.add(circle_enabler)
 
     ######## draw shapes ########
-    circle = dwg.circle(center=(w(50), h(50)), r=w(40), fill=random.choice(COLORS), filter=f"url(#filterTextured)")
-    dwg.add(circle)
+    fill_color = FILL_COLOR if SINGLE_COLOR else random.choice(COLORS)
+    shape = None
+    if SHAPE == "Circle": 
+        shape = dwg.circle(center=(w(50), h(50)), r=w(SHAPE_DIMENSIONS/2), fill=fill_color, filter=f"url(#filterTextured)")
+    elif SHAPE == "Square":
+        shape = dwg.rect(insert=(w((100-SHAPE_DIMENSIONS)/2), h((100-SHAPE_DIMENSIONS)/2)), size=(w(SHAPE_DIMENSIONS), w(SHAPE_DIMENSIONS)), fill=fill_color, filter=f"url(#filterTextured)")
+        
+    dwg.add(shape)
     
     return dwg
  
@@ -335,6 +338,8 @@ preset_filters_standard = {
     "TEXTURE_TYPE": "fractalNoise",
     "BASE_FREQUENCY": 0.05,
     "NUM_OCTAVES": 20,
+    "SINGLE_COLOR": True,
+    "FILL_COLOR": "#D412BC",
     "SURFACE_SCALE": 20.0,
     "DIFFUSE_CONSTANT": 1.0,
     "LIGHTING_COLOR_INPUT": "#fff",
@@ -351,26 +356,37 @@ presets = [
         "name": "Standard Filters Piece",
         "MODULE": "Filters"
     } | 
-    preset_general_standard | 
+    { **preset_general_standard, "HEIGHT": 600} | 
     preset_animation_standard | 
     preset_filters_standard,
+    
+    #########
     { 
         "name": "Turbulent Filter",
         "MODULE": "Filters"
     } | 
-    preset_general_standard | 
+    { **preset_general_standard, "HEIGHT": 600} | 
     preset_animation_standard | 
-    { **preset_filters_standard, "TEXTURE_TYPE": "turbulence" }
+    { **preset_filters_standard, "TEXTURE_TYPE": "turbulence" },
+    
+    #########
+    { 
+        "name": "Square Filter",
+        "MODULE": "Filters"
+    } | 
+    { **preset_general_standard, "HEIGHT": 600} | 
+    preset_animation_standard | 
+    { **preset_filters_standard, "SHAPE": "Square", "FILL_COLOR": "#83CAD0" }
 ]
 
 ################# SIDEBAR CONFIGURATION #################
 # Streamlit inputs for configuration
 st.set_page_config(layout="wide")
-st.sidebar.header("Configuration")
 preset_names = [preset["name"] for preset in presets]
 PRESET = st.sidebar.selectbox("Choose Preset", preset_names)
 sp = next(preset for preset in presets if preset["name"] == PRESET) # selected preset
 
+st.sidebar.header("General Settings")
 SEED = st.sidebar.number_input("Random Seed", value=3)
 with st.sidebar.expander("General Settings"):
     WIDTH = st.number_input("Width", value=sp.get("WIDTH", 600), step=1)
@@ -386,6 +402,7 @@ with st.sidebar.expander("General Animation Settings"):
     ANIMATION_DURATION_INPUT = st.number_input("Animation Duration in s", value=sp.get("ANIMATION_DURATION_INPUT", 5.0), step=0.1)
     ANIMATION_DURATION = f"{ANIMATION_DURATION_INPUT}s"
 
+st.sidebar.header("Type Settings")
 modules = ["Bubbles", "Filters", "Waves", "Radial Waves", "Splotches"]
 MODULE = st.sidebar.selectbox("Type of Graphic", modules, index=modules.index(sp.get("MODULE", "Waves")))
 # TODO: 1) clean up the filters to have the general settings actually apply to everything (check animation...),
@@ -396,11 +413,22 @@ if MODULE == "Bubbles":
     IS_DISTORTED = st.sidebar.checkbox("Distorted", value=True)
     HAS_NOISE = st.sidebar.checkbox("Has Noise", value=False)
 if MODULE == "Filters":
+    with st.sidebar.expander("Shape Settings"):
+        shapes = ["Square", "Circle"]
+        SHAPE = st.selectbox("Shape", shapes, index=shapes.index(sp.get("SHAPE", "Circle")))
+        SHAPE_DIMENSIONS = st.number_input("Shape Dimensions (relative to canvas width)", value=sp.get("SHAPE_DIMENSIONS", 80.0), step=1.0)
+        
+        
     with st.sidebar.expander("Texture Settings"):
         texture_types = ["fractalNoise", "turbulence"]
-        TEXTURE_TYPE = st.selectbox("Color Scheme", texture_types, index=texture_types.index(sp.get("TEXTURE_TYPE", "fractalNois")))
+        TEXTURE_TYPE = st.selectbox("Color Scheme", texture_types, index=texture_types.index(sp.get("TEXTURE_TYPE", "fractalNoise")))
         BASE_FREQUENCY = st.number_input("Base Frequency", value=sp.get("BASE_FREQUENCY", 0.05), step=0.1)
         NUM_OCTAVES = st.number_input("Number of Octaves", value=sp.get("NUM_OCTAVES", 20), step=1)
+    
+    with st.sidebar.expander("Color Settings"):
+        SINGLE_COLOR = st.checkbox("Use Single Color", value=sp.get("SINGLE_COLOR", True))
+        if (SINGLE_COLOR):
+            FILL_COLOR = st.color_picker("Choose Color", value=sp.get("FILL_COLOR", "#D412BC"))
     
     with st.sidebar.expander("Lighting Settings"):
         SURFACE_SCALE = st.number_input("Surface Scale", value=sp.get("SURFACE_SCALE", 20.0), step=1.0)
