@@ -4,7 +4,6 @@ import random
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import colorsys
-from datetime import datetime
 import tempfile
 import numpy as np
 
@@ -31,44 +30,6 @@ def hex_to_rgb_with_luminosity(hex_color, luminosity):
     
     # Return the adjusted RGB value as a hex string
     return mcolors.to_hex(adjusted_rgb)
-    # Convert hex to RGB (0-1 range) using mcolors
-    rgb = mcolors.to_rgb(hex_color)
-    
-    # Convert RGB to HLS using colorsys
-    h, l, s = colorsys.rgb_to_hls(*rgb)
-    
-    # Use the provided luminosity value (0-1 range) and clamp between 0 and 1
-    l = max(0, min(1, luminosity))
-    
-    # Convert H to degrees (0-360), S and L to percentages (0-100%)
-    h_deg = h * 360
-    s_percent = s * 100
-    l_percent = l * 100
-    
-    # Return the formatted HSL string for SVG
-    return f"hsl({h_deg:.0f}, {s_percent:.0f}%, {l_percent:.0f}%)"
-    # Convert hex to RGB (0-1 range) using mcolors
-    rgb = mcolors.to_rgb(hex_color)
-    
-    # Convert RGB to HLS using the colorsys module
-    h, l, s = colorsys.rgb_to_hls(*rgb)
-    
-    # Use the provided luminosity value (0-1 range)
-    l = max(0, min(1, luminosity))  # Clamp luminosity to [0, 1] just in case
-    
-    # Return the formatted HSL string
-    return f"hsl({h:.2f}, {s:.2f}, {l:.2f})"
-    # Convert hex to RGB (0-1 range)
-    rgb = mcolors.to_rgb(hex_color)
-    
-    # Convert RGB to HSL (HLS in matplotlib, but effectively the same)
-    h, l, s = mcolors.rgb_to_hls(*rgb)
-    
-    # Use the provided luminosity value (0-1 range)
-    l = max(0, min(1, luminosity))  # Clamp luminosity to [0, 1] just in case
-    
-    # Return the formatted HSL string
-    return f"hsl({h:.2f}, {s:.2f}, {l:.2f})"
 
 def complementary_color(hex_color):
     # Convert the hex color to an RGB tuple
@@ -355,27 +316,78 @@ def generate_waves(dwg):
         dwg.add(rect)
     
     return dwg
-        
+
+################# PRESET DEFINITION #################
+preset_general_standard = {
+    "WIDTH": 600,
+    "HEIGHT": 900,
+    "COLOR_SCHEME": "viridis",
+    "BACKGROUND_COLOR": "#fff",
+}
+
+preset_animation_standard = {
+    "IS_ANIMATED": True,
+    "REPEAT_ANIMATION": True,
+    "ANIMATION_DURATION_INPUT": 5.0
+}
+
+preset_filters_standard = {
+    "TEXTURE_TYPE": "fractalNoise",
+    "BASE_FREQUENCY": 0.05,
+    "NUM_OCTAVES": 20,
+    "SURFACE_SCALE": 20.0,
+    "DIFFUSE_CONSTANT": 1.0,
+    "LIGHTING_COLOR_INPUT": "#fff",
+    "MIN_X_PERC": 10.0,
+    "MAX_X_PERC": 90.0,
+    "MIN_Y_PERC": 10.0,
+    "MAX_Y_PERC": 10.0,
+    "MIN_Z": 5.0,
+    "MAX_Z": 500.0,
+}
+
+presets = [
+    { 
+        "name": "Standard Filters Piece",
+        "MODULE": "Filters"
+    } | 
+    preset_general_standard | 
+    preset_animation_standard | 
+    preset_filters_standard,
+    { 
+        "name": "Turbulent Filter",
+        "MODULE": "Filters"
+    } | 
+    preset_general_standard | 
+    preset_animation_standard | 
+    { **preset_filters_standard, "TEXTURE_TYPE": "turbulence" }
+]
+
 ################# SIDEBAR CONFIGURATION #################
 # Streamlit inputs for configuration
 st.set_page_config(layout="wide")
 st.sidebar.header("Configuration")
+preset_names = [preset["name"] for preset in presets]
+PRESET = st.sidebar.selectbox("Choose Preset", preset_names)
+sp = next(preset for preset in presets if preset["name"] == PRESET) # selected preset
+
 SEED = st.sidebar.number_input("Random Seed", value=3)
 with st.sidebar.expander("General Settings"):
-    WIDTH = st.number_input("Width", value=600, step=1)
-    HEIGHT = st.number_input("Height", value=900, step=1)
+    WIDTH = st.number_input("Width", value=sp.get("WIDTH", 600), step=1)
+    HEIGHT = st.number_input("Height", value=sp.get("HEIGHT", 600), step=1)
     valid_color_schemes = [cmap_name for cmap_name in plt.colormaps() if hasattr(plt.get_cmap(cmap_name), 'colors')]
-    COLOR_SCHEME = st.selectbox("Color Scheme", valid_color_schemes, index=valid_color_schemes.index('viridis'))
+    COLOR_SCHEME = st.selectbox("Color Scheme", valid_color_schemes, index=valid_color_schemes.index(sp.get("COLOR_SCHEME", 600)))
     COLORS = [mcolors.rgb2hex(color) for color in plt.get_cmap(COLOR_SCHEME).colors]
-    BACKGROUND_COLOR = st.color_picker("Background Color", value="#fff")
+    BACKGROUND_COLOR = st.color_picker("Background Color", value=sp.get("BACKGROUND_COLOR", 600))
 
 with st.sidebar.expander("General Animation Settings"):
-    IS_ANIMATED = st.checkbox("Animated", value=True)
-    REPEAT_ANIMATION = st.checkbox("Repeat Animation", value=True)
-    ANIMATION_DURATION_INPUT = st.number_input("Animation Duration in s", value=10.0, step=0.1)
+    IS_ANIMATED = st.checkbox("Animated", value=sp.get("IS_ANIMATED", True))
+    REPEAT_ANIMATION = st.checkbox("Repeat Animation", value=sp.get("REPEAT_ANIMATION", True))
+    ANIMATION_DURATION_INPUT = st.number_input("Animation Duration in s", value=sp.get("ANIMATION_DURATION_INPUT", 5.0), step=0.1)
     ANIMATION_DURATION = f"{ANIMATION_DURATION_INPUT}s"
 
-MODULE = st.sidebar.selectbox("Type of Graphic", ["Bubbles", "Filters", "Waves", "Radial Waves", "Splotches"], index=2)
+modules = ["Bubbles", "Filters", "Waves", "Radial Waves", "Splotches"]
+MODULE = st.sidebar.selectbox("Type of Graphic", modules, index=modules.index(sp.get("MODULE", "Waves")))
 # TODO: 1) clean up the filters to have the general settings actually apply to everything (check animation...),
 # and 2) rework the animation in bubbles to actually use the animation duration setting (+ another setting prbably) 
 # rather than the weird speed construct...
@@ -385,24 +397,25 @@ if MODULE == "Bubbles":
     HAS_NOISE = st.sidebar.checkbox("Has Noise", value=False)
 if MODULE == "Filters":
     with st.sidebar.expander("Texture Settings"):
-        TEXTURE_TYPE = st.selectbox("Color Scheme", ["fractalNoise", "turbulence"], index=0)
-        BASE_FREQUENCY = st.number_input("Base Frequency", value=0.05, step=0.1)
-        NUM_OCTAVES = st.number_input("Number of Octaves", value=20, step=1)
+        texture_types = ["fractalNoise", "turbulence"]
+        TEXTURE_TYPE = st.selectbox("Color Scheme", texture_types, index=texture_types.index(sp.get("TEXTURE_TYPE", "fractalNois")))
+        BASE_FREQUENCY = st.number_input("Base Frequency", value=sp.get("BASE_FREQUENCY", 0.05), step=0.1)
+        NUM_OCTAVES = st.number_input("Number of Octaves", value=sp.get("NUM_OCTAVES", 20), step=1)
     
     with st.sidebar.expander("Lighting Settings"):
-        SURFACE_SCALE = st.number_input("Surface Scale", value=20.0, step=1.0)
-        DIFFUSE_CONSTANT = st.number_input("Diffuse Constant", value=1.0, step=1.0)
-        LIGHTING_COLOR_INPUT = st.text_input("Lighting Color", value="white")
+        SURFACE_SCALE = st.number_input("Surface Scale", value=sp.get("SURFACE_SCALE", 20.0), step=1.0)
+        DIFFUSE_CONSTANT = st.number_input("Diffuse Constant", value=sp.get("DIFFUSE_CONSTANT", 1.0), step=1.0)
+        LIGHTING_COLOR_INPUT = st.color_picker("Lighting Color", value=sp.get("LIGHTING_COLOR_INPUT", "#fff"))
         
     with st.sidebar.expander("Filter Animation Settings"):        
-        MIN_X_PERC = st.number_input("min x (relative to canvas width)", value=10.0, step=1.0)
-        MAX_X_PERC = st.number_input("max x (relative to canvas width)", value=90.0, step=1.0)
+        MIN_X_PERC = st.number_input("min x (relative to canvas width)", value=sp.get("MIN_X_PERC", 10.0), step=1.0)
+        MAX_X_PERC = st.number_input("max x (relative to canvas width)", value=sp.get("MAX_X_PERC", 90.0), step=1.0)
         st.divider()
-        MIN_Y_PERC = st.number_input("min y (relative to canvas width)", value=10.0, step=1.0)
-        MAX_Y_PERC = st.number_input("max y (relative to canvas width)", value=10.0, step=1.0)
+        MIN_Y_PERC = st.number_input("min y (relative to canvas width)", value=sp.get("MIN_Y_PERC", 10.0), step=1.0)
+        MAX_Y_PERC = st.number_input("max y (relative to canvas width)", value=sp.get("MAX_Y_PERC", 10.0), step=1.0)
         st.divider()
-        MIN_Z = st.number_input("min z", value=5.0, step=1.0)
-        MAX_Z = st.number_input("max z", value=500.0, step=1.0)    
+        MIN_Z = st.number_input("min z", value=sp.get("MIN_Z", 5.0), step=1.0)
+        MAX_Z = st.number_input("max z", value=sp.get("MAX_Z", 500.0), step=1.0)    
 if MODULE == "Waves":
     with st.sidebar.expander("Layout Settings"):
         NUMBER_OF_WAVES = st.number_input("Number of Waves", min_value=1, max_value=1000, value=30, step=1)
