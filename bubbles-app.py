@@ -323,7 +323,7 @@ def generate_waves(dwg):
     
     # Define the shadow filter using feGaussianBlur and feOffset
     if HAS_SHADOW: 
-        filter_element = dwg.filter(id="shadow")
+        filter_element = dwg.filter(id="shadow", x="-50%", y="-50%", width="200%", height="200%")
         filter_element.feGaussianBlur(in_="SourceAlpha", stdDeviation=SHADOW_BLURRINESS, result="blur")
         filter_element.feOffset(in_="blur", dx=0, dy=-h(SHADOW_OFFSET_Y), result="offsetBlur")
         filter_element.feFlood(flood_color=SHADOW_COLOR, flood_opacity=SHADOW_OPACITY, result="floodShadow")  # Set a less intense shadow color
@@ -424,7 +424,7 @@ def generate_waves(dwg):
 def generate_splotches(dwg):
     # Define the shadow filter using feGaussianBlur and feOffset
     if HAS_SHADOW: 
-        filter_element = dwg.filter(id="shadow")
+        filter_element = dwg.filter(id="shadow", x="-50%", y="-50%", width="200%", height="200%")
         filter_element.feGaussianBlur(in_="SourceAlpha", stdDeviation=SHADOW_BLURRINESS, result="blur")
         filter_element.feOffset(in_="blur", dx=w(SHADOW_OFFSET_X), dy=w(SHADOW_OFFSET_Y), result="offsetBlur")
         filter_element.feFlood(flood_color=SHADOW_COLOR, flood_opacity=SHADOW_OPACITY, result="floodShadow")  # Set a less intense shadow color
@@ -762,12 +762,16 @@ presets_splotches = [
     {
         "WIDTH": 900,
         "SEED": 8,
-        "NUMBER_OF_SPLOTCHES": 5,
+        "NUMBER_OF_SPLOTCHES": 13,
         "NUMBER_OF_SPLOTCH_POINTS_MIN" : 5,
         "NUMBER_OF_SPLOTCH_POINTS_MAX": 9,
         "SPLOTCH_POINT_SPACING_RANDOMNESS": 1.0,
         "SPLOTCH_POINT_RADIAL_RANDOMNESS": 0.6,
-        "CONTROL_ARM_LENGTH": 0.2
+        "CONTROL_ARM_LENGTH": 0.2,
+        "HAS_SHADOW": True,
+        "SHADOW_BLURRINESS": 12,
+        "SHADOW_OPACITY": 0.95,
+        
     }
 ]
 
