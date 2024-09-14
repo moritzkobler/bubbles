@@ -422,13 +422,14 @@ def generate_waves(dwg):
     return dwg
 
 def generate_splotches(dwg):
+    # TODO: Animate the blotches, either their form or their position, or both?
+    # TODO: Get some of the texture stuff in, make them look metallic and light reflecting...
     # Define the shadow filter using feGaussianBlur and feOffset
     if HAS_SHADOW: 
         filter_element = dwg.filter(id="shadow", x="-50%", y="-50%", width="200%", height="200%")
         filter_element.feGaussianBlur(in_="SourceAlpha", stdDeviation=SHADOW_BLURRINESS, result="blur")
-        filter_element.feOffset(in_="blur", dx=w(SHADOW_OFFSET_X), dy=w(SHADOW_OFFSET_Y), result="offsetBlur")
         filter_element.feFlood(flood_color=SHADOW_COLOR, flood_opacity=SHADOW_OPACITY, result="floodShadow")  # Set a less intense shadow color
-        filter_element.feComposite(in_="floodShadow", in2="offsetBlur", operator="in", result="compositeShadow")
+        filter_element.feComposite(in_="floodShadow", in2="blur", operator="in", result="compositeShadow")
     
         dwg.defs.add(filter_element)
     
@@ -440,56 +441,135 @@ def generate_splotches(dwg):
         number_of_splotch_points = random.choice(range(NUMBER_OF_SPLOTCH_POINTS_MIN, NUMBER_OF_SPLOTCH_POINTS_MAX + 1))
         
         splotch_points_regular = generate_regular_points(c, number_of_splotch_points, r)
-        splotch_points = [translate_point_radially(translate_point_tangentially(p, c, SPLOTCH_POINT_SPACING_RANDOMNESS * (random.random() - 0.5)), c, SPLOTCH_POINT_RADIAL_RANDOMNESS * (random.random() - 0.5)) for p in splotch_points_regular]
+        splotch_points_from = [translate_point_radially(translate_point_tangentially(p, c, SPLOTCH_POINT_SPACING_RANDOMNESS * (random.random() - 0.5)), c, SPLOTCH_POINT_RADIAL_RANDOMNESS * (random.random() - 0.5)) for p in splotch_points_regular]
+        splotch_points_to = [translate_point_radially(p, c, SPLOTCH_POINT_ANIMATION_STRENGTH * (random.random() - 0.5)) for p in splotch_points_from]
         
-        start_point_x, start_point_y = splotch_points[0]
-        from_path_data = f"M {w(start_point_x)},{h(start_point_y)}\n"
+        start_point_from_x, start_point_from_y = splotch_points_from[0]
+        from_path_data = f"M {w(start_point_from_x)},{h(start_point_from_y)}\n"
+        start_point_to_x, start_point_to_y = splotch_points_to[0]
+        to_path_data = f"M {w(start_point_to_x)},{h(start_point_to_y)}\n"
         
-        for k, (p_x, p_y) in enumerate(splotch_points):
+        for k, ((from_x, from_y), (to_x, to_y))  in enumerate(zip(splotch_points_from, splotch_points_to)):
+            ### FROM
             # find the previous and next points, wrapping around
-            p_prev = splotch_points[(k - 1) % len(splotch_points)]
-            p_next = splotch_points[(k + 1) % len(splotch_points)]
+            from_prev = splotch_points_from[(k - 1) % len(splotch_points_from)]
+            from_next = splotch_points_from[(k + 1) % len(splotch_points_from)]
             
             # calculate control points for p
-            control_x, control_y = calculate_control(p_prev, (p_x, p_y), p_next, CONTROL_ARM_LENGTH)
+            from_control_x, from_control_y = calculate_control(from_prev, (from_x, from_y), from_next, CONTROL_ARM_LENGTH)
             
-            from_path_data += f"S {w(control_x)},{h(control_y)} {w(p_x)},{h(p_y)}\n"
+            from_path_data += f"S {w(from_control_x)},{h(from_control_y)} {w(from_x)},{h(from_y)}\n"
         
+            ### TO
+            # find the previous and next points, wrapping around
+            to_prev = splotch_points_to[(k - 1) % len(splotch_points_to)]
+            to_next = splotch_points_to[(k + 1) % len(splotch_points_to)]
+            
+            # calculate control points for p
+            to_control_x, to_control_y = calculate_control(to_prev, (to_x, to_y), to_next, CONTROL_ARM_LENGTH)
+            
+            to_path_data += f"S {w(to_control_x)},{h(to_control_y)} {w(to_x)},{h(to_y)}\n"
+        
+        ### FROM
         # add the first point again, to get a smooth closure
-        p_x, p_y = splotch_points[0]
-        p_prev = splotch_points[-1]
-        p_next = splotch_points[1]
-        control_x, control_y = calculate_control(p_prev, (p_x, p_y), p_next, CONTROL_ARM_LENGTH)
-        from_path_data += f"S {w(control_x)},{h(control_y)} {w(p_x)},{h(p_y)}\n"
+        from_x, from_y = splotch_points_from[0]
+        from_prev = splotch_points_from[-1]
+        from_next = splotch_points_from[1]
+        control_x, control_y = calculate_control(from_prev, (from_x, from_y), from_next, CONTROL_ARM_LENGTH)
+        from_path_data += f"S {w(control_x)},{h(control_y)} {w(from_x)},{h(from_y)}\n"
+        
+        ### TO
+        # add the first point again, to get a smooth closure
+        to_x, to_y = splotch_points_to[0]
+        to_prev = splotch_points_to[-1]
+        to_next = splotch_points_to[1]
+        control_x, control_y = calculate_control(to_prev, (to_x, to_y), to_next, CONTROL_ARM_LENGTH)
+        to_path_data += f"S {w(control_x)},{h(control_y)} {w(to_x)},{h(to_y)}\n"
         
         # close the path
         from_path_data += "Z"
+        to_path_data +="Z"
         
         # create the stripped path
         from_path = from_path_data.replace('\n', ' ').strip()
-        to_path = from_path
+        to_path = to_path_data.replace('\n', ' ').strip()
         fill_color = FILL_COLOR if SINGLE_COLOR else random.choice(COLORS)
 
         splotch = dwg.path(d=from_path, fill=fill_color)
-        if HAS_SHADOW: splotch_shadow = dwg.path(d=from_path, fill="blue", filter="url(#shadow)")
+        
+        if HAS_SHADOW:
+            # need to offset the shadow manually and not use the offset in the filter definition as the rotation would otherwise
+            # make the shadow not look quite right...
+            splotch_shadow = dwg.path(d=from_path, fill="blue", filter="url(#shadow)", transform=f"translate({w(SHADOW_OFFSET_X)} {h(SHADOW_OFFSET_Y)})")
         
         # NOTE: The animation only works if x and y coordinates in the path are comma separated, and points are space separated
         # i.e. 'S 50 50, 20 20' doesn't work, but 'S 50,50 20,20' does... 
         if IS_ANIMATED:
-            animation = dwg.animate(
-                attributeName="d",
-                dur=ANIMATION_DURATION,
-                repeatCount="indefinite" if REPEAT_ANIMATION else 1,
-                values=[from_path, to_path, from_path],
-                keyTimes="0;0.5;1",
-                calcMode="spline",
-                keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
-            )
+            if SPLOTCH_POINTS_ANIMATED:
+                animate_splotch_points = dwg.animate(
+                    attributeName="d",
+                    dur=f"{SPLOTCH_POINT_ANIMATION_DURATION}s",
+                    repeatCount="indefinite" if REPEAT_ANIMATION else 1,
+                    values=[from_path, to_path, from_path],
+                    keyTimes="0;0.5;1",
+                    calcMode="spline",
+                    keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+                )
             
-            splotch.add(animation)
-            if HAS_SHADOW: splotch_shadow.add(animation)
+            if SPLOTCHES_TRANSLATE:
+                travel_distance_x = MIN_X_DISTANCE_PERC + (MAX_X_DISTANCE_PERC - MIN_X_DISTANCE_PERC) * random.random() # reused later
+                travel_distance_y = MIN_Y_DISTANCE_PERC + (MAX_Y_DISTANCE_PERC - MIN_Y_DISTANCE_PERC) * random.random() # reused later
+                animate_translation = dwg.animateTransform(
+                    transform="translate",
+                    repeatCount="indefinite",
+                    dur=f"{SPLOTCH_TRANSLATION_DURATION}s",
+                    values=f"0 0;{w(travel_distance_x)} {h(travel_distance_y)};0 0",
+                    keyTimes="0;0.5;1",
+                    calcMode="spline",
+                    keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+                )
+                
+                # something is failing in the svgwrite library... need to set the attributeName manually
+                animate_translation["attributeName"] = "transform"
+                    
+            if SPLOTCHES_ROTATE:    
+                animate_rotation = dwg.animateTransform(
+                    transform="rotate",
+                    repeatCount="indefinite",
+                    dur=f"{MIN_SPLOTCH_ROTATION_DURATION + (MAX_SPLOTCH_ROTATION_DURATION - MIN_SPLOTCH_ROTATION_DURATION) * random.random()}s",
+                    from_=f"0 {w(c[0])} {h(c[1])}",
+                    to=f"360 {w(c[0])} {h(c[1])}",
+                    additive="sum"
+                )
+                
+                animate_rotation["attributeName"] = "transform"
+            
+            if HAS_SHADOW and SPLOTCHES_TRANSLATE:
+                # shadow needs to be translated separately because it's offset
+                animate_translation_shadow = dwg.animateTransform(
+                    transform="translate",
+                    repeatCount="indefinite",
+                    dur=f"{SPLOTCH_TRANSLATION_DURATION}s",
+                    values=f"{w(SHADOW_OFFSET_X)} {h(SHADOW_OFFSET_Y)};{w(travel_distance_x + SHADOW_OFFSET_X)} {h(travel_distance_y + SHADOW_OFFSET_Y)};{w(SHADOW_OFFSET_X)} {h(SHADOW_OFFSET_Y)}",
+                    keyTimes="0;0.5;1",
+                    calcMode="spline",
+                    keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+                )
+                
+                animate_translation_shadow["attributeName"] = "transform"
+            
+            if SPLOTCH_POINTS_ANIMATED: splotch.add(animate_splotch_points)
+            if SPLOTCHES_TRANSLATE:splotch.add(animate_translation)
+            if SPLOTCHES_ROTATE:splotch.add(animate_rotation)
+            
+            # add shadow animations
+            if HAS_SHADOW:
+                if SPLOTCH_POINTS_ANIMATED: splotch_shadow.add(animate_splotch_points)
+                if SPLOTCHES_TRANSLATE:splotch_shadow.add(animate_translation_shadow)
+                if SPLOTCHES_ROTATE:splotch_shadow.add(animate_rotation)
         
         if HAS_SHADOW: dwg.add(splotch_shadow)
+        
         dwg.add(splotch)
         
     if HAS_NOISE:
@@ -574,6 +654,8 @@ preset_waves_standard = {
 }
 
 preset_spotches_standard = {
+    "NUMBER_OF_SPLOTCH_POINTS_MIN": 6,
+    "NUMBER_OF_SPLOTCH_POINTS_MAX": 9,
     "SINGLE_COLOR": False,
     "FILL_COLOR": "#FF4800",
     "HAS_NOISE": True,
@@ -585,7 +667,7 @@ preset_spotches_standard = {
     "SHADOW_OFFSET_Y": 2.0,
     "SPLOTCH_POINT_SPACING_RANDOMNESS": 1.0,
     "SPLOTCH_POINT_RADIAL_RANDOMNESS": 0.9, 
-    "CONTROL_ARM_LENGTH": 0.2  
+    "CONTROL_ARM_LENGTH": 0.2,
 }
 
 # define presets
@@ -754,7 +836,7 @@ presets_waves = [
 presets_splotches = [
     { 
         "name": "Default Splotch",
-        "MODULE": "Splotches"
+        "MODULE": "Splotches",
     } | 
     preset_general_standard | 
     preset_animation_standard |
@@ -763,7 +845,7 @@ presets_splotches = [
         "WIDTH": 900,
         "SEED": 8,
         "NUMBER_OF_SPLOTCHES": 13,
-        "NUMBER_OF_SPLOTCH_POINTS_MIN" : 5,
+        "NUMBER_OF_SPLOTCH_POINTS_MIN" : 6,
         "NUMBER_OF_SPLOTCH_POINTS_MAX": 9,
         "SPLOTCH_POINT_SPACING_RANDOMNESS": 1.0,
         "SPLOTCH_POINT_RADIAL_RANDOMNESS": 0.6,
@@ -771,10 +853,137 @@ presets_splotches = [
         "HAS_SHADOW": True,
         "SHADOW_BLURRINESS": 12,
         "SHADOW_OPACITY": 0.95,
-        
+        "ANIMATION_DURATION_INPUT": 20.0,
+        "SPLOTCH_ANIMATION_STRENGTH": 0.5
+    },
+    { 
+        "name": "Single Gooey Splotch",
+        "MODULE": "Splotches",
+    } | 
+    preset_general_standard | 
+    preset_animation_standard |
+    preset_spotches_standard |
+    {
+        "WIDTH": 900,
+        "SEED": 10,
+        "NUMBER_OF_SPLOTCHES": 1,
+        "SPLOTCH_SIZE_MIN": 20.0,
+        "SPLOTCH_SIZE_MAX": 30.0,
+        "NUMBER_OF_SPLOTCH_POINTS_MIN" : 7,
+        "NUMBER_OF_SPLOTCH_POINTS_MAX": 7,
+        "SPLOTCH_POINT_SPACING_RANDOMNESS": 0.0,
+        "SPLOTCH_POINT_RADIAL_RANDOMNESS": 0.8,
+        "CONTROL_ARM_LENGTH": 0.2,
+        "SINGLE_COLOR": True,
+        "FILL_COLOR": "#EF5E23",
+        "HAS_SHADOW": False,
+        "SPLOTCH_POINTS_ANIMATED": True,
+        "SPLOTCH_POINT_ANIMATION_DURATION": 10.0,
+        "SPLOTCH_POINT_ANIMATION_STRENGTH": 2.0,
+        "SPLOTCHES_TRANSLATE": False,
+        "SPLOTCHES_ROTATE": True,
+        "MIN_SPLOTCH_ROTATION_DURATION": 60.0,
+        "MAX_SPLOTCH_ROTATION_DURATION": 60.0
+    },
+    { 
+        "name": "Slow Splotches",
+        "MODULE": "Splotches",
+    } | 
+    preset_general_standard | 
+    preset_animation_standard |
+    preset_spotches_standard |
+    {
+        "COLOR_SCHEME": "plasma",
+        "BACKGROUND_COLOR": "#161414",
+        "HAS_NOISE": False,
+        "IS_ANIMATED": True,
+        "WIDTH": 900,
+        "SEED": 96,
+        "NUMBER_OF_SPLOTCHES": 5,
+        "SPLOTCH_SIZE_MIN": 10.0,
+        "SPLOTCH_SIZE_MAX": 30.0,
+        "NUMBER_OF_SPLOTCH_POINTS_MIN" : 4,
+        "NUMBER_OF_SPLOTCH_POINTS_MAX": 6,
+        "SPLOTCH_POINT_SPACING_RANDOMNESS": 0.0,
+        "SPLOTCH_POINT_RADIAL_RANDOMNESS": 0.8,
+        "CONTROL_ARM_LENGTH": 0.2,
+        "SINGLE_COLOR": False,
+        "SPLOTCH_POINTS_ANIMATED": True,
+        "SPLOTCH_POINT_ANIMATION_DURATION": 5.0,
+        "SPLOTCH_POINT_ANIMATION_STRENGTH": 0.2,
+        "SPLOTCHES_TRANSLATE": False,
+        "SPLOTCHES_ROTATE": True,
+        "MIN_SPLOTCH_ROTATION_DURATION": 120.0,
+        "MAX_SPLOTCH_ROTATION_DURATION": 360.0
+    },
+    { 
+        "name": "Slow Splotches 2",
+        "MODULE": "Splotches",
+    } | 
+    preset_general_standard | 
+    preset_animation_standard |
+    preset_spotches_standard |
+    {
+        "COLOR_SCHEME": "plasma",
+        "BACKGROUND_COLOR": "#161414",
+        "HAS_NOISE": False,
+        "IS_ANIMATED": True,
+        "WIDTH": 900,
+        "SEED": 79,
+        "NUMBER_OF_SPLOTCHES": 5,
+        "SPLOTCH_SIZE_MIN": 10.0,
+        "SPLOTCH_SIZE_MAX": 30.0,
+        "NUMBER_OF_SPLOTCH_POINTS_MIN" : 4,
+        "NUMBER_OF_SPLOTCH_POINTS_MAX": 6,
+        "SPLOTCH_POINT_SPACING_RANDOMNESS": 0.0,
+        "SPLOTCH_POINT_RADIAL_RANDOMNESS": 0.8,
+        "CONTROL_ARM_LENGTH": 0.2,
+        "SINGLE_COLOR": False,
+        "SPLOTCH_POINTS_ANIMATED": True,
+        "SPLOTCH_POINT_ANIMATION_DURATION": 5.0,
+        "SPLOTCH_POINT_ANIMATION_STRENGTH": 0.2,
+        "SPLOTCHES_TRANSLATE": False,
+        "SPLOTCHES_ROTATE": True,
+        "MIN_SPLOTCH_ROTATION_DURATION": 120.0,
+        "MAX_SPLOTCH_ROTATION_DURATION": 360.0
+    },
+    { 
+        "name": "Crazy Splotches",
+        "MODULE": "Splotches",
+    } | 
+    preset_general_standard | 
+    preset_animation_standard |
+    preset_spotches_standard |
+    {
+        "COLOR_SCHEME": "plasma",
+        "BACKGROUND_COLOR": "#161414",
+        "HAS_NOISE": False,
+        "IS_ANIMATED": True,
+        "WIDTH": 900,
+        "SEED": 79,
+        "NUMBER_OF_SPLOTCHES": 200,
+        "SPLOTCH_SIZE_MIN": 1.0,
+        "SPLOTCH_SIZE_MAX": 5.0,
+        "NUMBER_OF_SPLOTCH_POINTS_MIN" : 4,
+        "NUMBER_OF_SPLOTCH_POINTS_MAX": 6,
+        "SPLOTCH_POINT_SPACING_RANDOMNESS": 0.0,
+        "SPLOTCH_POINT_RADIAL_RANDOMNESS": 0.8,
+        "CONTROL_ARM_LENGTH": 0.2,
+        "SINGLE_COLOR": False,
+        "SPLOTCH_POINTS_ANIMATED": True,
+        "SPLOTCH_POINT_ANIMATION_DURATION": 0.5,
+        "SPLOTCH_POINT_ANIMATION_STRENGTH": 0.25,
+        "SPLOTCHES_TRANSLATE": True,
+        "SPLOTCH_TRANSLATION_DURATION": 20.0,
+        "MIN_X_DISTANCE_PERC": -50.0,
+        "MAX_X_DISTANCE_PERC": 50.0,
+        "MIN_Y_DISTANCE_PERC": -50.0,
+        "MAX_Y_DISTANCE_PERC": 50.0,
+        "SPLOTCHES_ROTATE": True,
+        "MIN_SPLOTCH_ROTATION_DURATION": 5.0,
+        "MAX_SPLOTCH_ROTATION_DURATION": 10.0
     }
 ]
-
 
 presets = presets_splotches + presets_bubbles + presets_filters + presets_waves
 
@@ -782,7 +991,7 @@ presets = presets_splotches + presets_bubbles + presets_filters + presets_waves
 # Streamlit inputs for configuration
 st.set_page_config(layout="wide")
 preset_names = [preset["name"] for preset in presets]
-PRESET = st.sidebar.selectbox("Choose Preset", preset_names)
+PRESET = st.sidebar.selectbox("Choose Preset", preset_names, index=preset_names.index("Slow Splotches"))
 sp = next(preset for preset in presets if preset["name"] == PRESET) # selected preset
 
 st.sidebar.header("General Settings")
@@ -901,8 +1110,8 @@ if MODULE == "Waves":
             SHADOW_OFFSET_Y = st.number_input("Shadow Offset (relative, negative)", value=sp.get("SHADOW_OFFSET_Y", 2.0), step=1.0, help="SHADOW_OFFSET_Y")
     
     with st.sidebar.expander("Wave Animation Settings"):
-        ANIMATION_STRENGTH = st.number_input("Animation Strength", value=sp.get("ANIMATION_STRENGTH", 0.15), min_value=0.0, step=0.05, help="ANIMATION_STRENGTH")
-
+        ANIMATION_STRENGTH = st.number_input("Animation Strength", value=sp.get("SPLOTCH_ANIMATION_STRENGTH", 0.15), min_value=0.0, step=0.05, help="SPLOTCH_ANIMATION_STRENGTH")
+       
 if MODULE == "Splotches":
     with st.sidebar.expander("Layout Settings"):
         NUMBER_OF_SPLOTCHES = st.number_input("Number of Splotches", min_value=1, max_value=1000, value=sp.get("NUMBER_OF_SPLOTCHES", 20), step=1, help="NUMBER_OF_SPLOTCHES")
@@ -914,7 +1123,7 @@ if MODULE == "Splotches":
         NUMBER_OF_SPLOTCH_POINTS_MIN = st.number_input("Min number of Splotch Points", min_value=2, value=sp.get("NUMBER_OF_SPLOTCH_POINTS_MIN", 5), step=1, help="NUMBER_OF_SPLOTCH_POINTS_MIN")
         NUMBER_OF_SPLOTCH_POINTS_MAX = st.number_input("Max number of Splotch Points", min_value=2, value=sp.get("NUMBER_OF_SPLOTCH_POINTS_MAX", 10), step=1, help="NUMBER_OF_SPLOTCH_POINTS_MAX")
         st.divider()
-        SPLOTCH_POINT_SPACING_RANDOMNESS = st.number_input("Splotch Point Spacing Randomness", min_value=0.0, value=sp.get("SPLOTCH_POINT_SPACING_RANDOMNESS", 1.0), step=1.0, help="SPLOTCH_POINT_SPACING_RANDOMNESS")
+        SPLOTCH_POINT_SPACING_RANDOMNESS = st.number_input("Splotch Point Spacing Randomness", min_value=0.0, value=sp.get("SPLOTCH_POINT_SPACING_RANDOMNESS", 1.0), step=0.5, help="SPLOTCH_POINT_SPACING_RANDOMNESS")
         SPLOTCH_POINT_RADIAL_RANDOMNESS = st.number_input("Splotch Point Radial Randomness", value=sp.get("SPLOTCH_POINT_RADIAL_RANDOMNESS", 5.0), step=0.1, help="SPLOTCH_POINT_RADIAL_RANDOMNESS")
         CONTROL_ARM_LENGTH = st.number_input("Control Arm Length (Relative)", value=sp.get("CONTROL_ARM_LENGTH", 0.2), min_value=0.0, step=0.01, help="CONTROL_ARM_LENGTH")
     
@@ -926,13 +1135,38 @@ if MODULE == "Splotches":
         HAS_NOISE = st.checkbox("Has Noise", value=sp.get("HAS_NOISE", True), help="HAS_NOISE")
     
     with st.sidebar.expander("Shadow Settings"):
-        HAS_SHADOW = st.checkbox("Add Wave Shadow", value=sp.get("HAS_SHADOW", False), help="HAS_SHADOW")
+        HAS_SHADOW = st.checkbox("Add Splotch Shadow", value=sp.get("HAS_SHADOW", False), help="HAS_SHADOW")
         if HAS_SHADOW:
+            if SINGLE_COLOR:
+                SHADOW_COLOR_COMPLEMENTARY = st.checkbox("Complementary Color", value=sp.get("SHADOW_COLOR_COMPLEMENTARY", False), help="SHADOW_COLOR_COMPLEMENTARY")
             SHADOW_COLOR = st.color_picker("Shadow Color", complementary_color(FILL_COLOR) if SINGLE_COLOR and SHADOW_COLOR_COMPLEMENTARY else sp.get("SHADOW_COLOR", "#000"), help="SHADOW_COLOR")
             SHADOW_BLURRINESS = st.number_input("Shadow Blurriness", value=sp.get("SHADOW_BLURRINESS", 20), min_value=0, step=1, help="SHADOW_BLURRINESS")
             SHADOW_OPACITY = st.number_input("Shadow Opacity", min_value=0.0, max_value=1.0, value=sp.get("SHADOW_OPACITY", 0.2), step=0.05, help="SHADOW_OPACITY")
             SHADOW_OFFSET_X = st.number_input("Shadow Offset X (relative to canvas width)", value=sp.get("SHADOW_OFFSET_X", 2.0), step=1.0, help="SHADOW_OFFSET_X")
             SHADOW_OFFSET_Y = st.number_input("Shadow Offset Y (relative to canvas width)", value=sp.get("SHADOW_OFFSET_Y", 2.0), step=1.0, help="SHADOW_OFFSET_Y")
+    
+    with st.sidebar.expander("Splotches Animation Settings"):
+        SPLOTCH_POINTS_ANIMATED = st.checkbox("Animate Splotch Points", value=sp.get("SPLOTCH_POINTS_ANIMATED", True), help="SPLOTCH_POINTS_ANIMATED")
+        if SPLOTCH_POINTS_ANIMATED:
+            SPLOTCH_POINT_ANIMATION_DURATION = st.number_input("Splotch Point Animation Duration", value=sp.get("SPLOTCH_POINT_ANIMATION_DURATION", 5.0), min_value=0.0, step=1.0, help="SPLOTCH_POINT_ANIMATION_DURATION")
+            SPLOTCH_POINT_ANIMATION_STRENGTH = st.number_input("Animation Strength", value=sp.get("SPLOTCH_POINT_ANIMATION_STRENGTH", 0.25), min_value=0.0, step=0.05, help="SPLOTCH_POINT_ANIMATION_STRENGTH")
+            st.divider()
+            
+        SPLOTCHES_TRANSLATE = st.checkbox("Splotches Translate", value=sp.get("SPLOTCHES_TRANSLATE", True), help="SPLOTCHES_TRANSLATE")
+        if SPLOTCHES_TRANSLATE:
+            SPLOTCH_TRANSLATION_DURATION = st.number_input("Splotch Translation Duration", value=sp.get("SPLOTCH_TRANSLATION_DURATION", 5.0), min_value=0.0, step=1.0, help="SPLOTCH_TRANSLATION_DURATION")
+            st.divider()
+            MIN_X_DISTANCE_PERC = st.number_input("Min x distance (relative to canvas width)", value=sp.get("MIN_X_DISTANCE_PERC", 0.0), step=1.0, help="MIN_X_DISTANCE_PERC")
+            MAX_X_DISTANCE_PERC = st.number_input("Max x distance (relative to canvas width)", value=sp.get("MAX_X_DISTANCE_PERC", 0.0), step=1.0, help="MAX_X_DISTANCE_PERC")
+            st.divider()
+            MIN_Y_DISTANCE_PERC = st.number_input("Min y distance (relative to canvas height)", value=sp.get("MIN_Y_DISTANCE_PERC", 4.0), step=1.0, help="MIN_Y_DISTANCE_PERC")
+            MAX_Y_DISTANCE_PERC = st.number_input("Max y distance (relative to canvas height)", value=sp.get("MAX_Y_DISTANCE_PERC", 20.0), step=1.0, help="MAX_Y_DISTANCE_PERC")
+            st.divider()
+            
+        SPLOTCHES_ROTATE = st.checkbox("Rotate Splotches", value=sp.get("SPLOTCHES_ROTATE", True), help="SPLOTCHES_ROTATE")
+        if SPLOTCHES_ROTATE:
+            MIN_SPLOTCH_ROTATION_DURATION = st.number_input("Min Splotch Rotation Duration", value=sp.get("MIN_SPLOTCH_ROTATION_DURATION", 5.0), min_value=0.0, step=1.0, help="MIN_SPLOTCH_ROTATION_DURATION")
+            MAX_SPLOTCH_ROTATION_DURATION = st.number_input("Max Splotch Rotation Duration", value=sp.get("MAX_SPLOTCH_ROTATION_DURATION", 5.0), min_value=0.0, step=1.0, help="MAX_SPLOTCH_ROTATION_DURATION")
 
 ################# MAIN BODY #################
 # set up the drawing environment
