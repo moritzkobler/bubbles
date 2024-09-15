@@ -43,7 +43,7 @@ def wave_settings(C, OTHER_CONFIG, sp):
             C["SHADOW_OFFSET_Y"] = st.number_input("Shadow Offset (relative, negative)", value=sp.get("SHADOW_OFFSET_Y", 2.0), step=1.0, help="SHADOW_OFFSET_Y")
     
     with st.sidebar.expander("Wave Animation Settings"):
-        C["ANIMATION_STRENGTH"] = st.number_input("Animation Strength", value=sp.get("SPLOTCH_ANIMATION_STRENGTH", 0.15), min_value=0.0, step=0.05, help="SPLOTCH_ANIMATION_STRENGTH")
+        C['ANIMATION_STRENGTH'] = st.number_input("Animation Strength", value=sp.get("SPLOTCH_ANIMATION_STRENGTH", 0.15), min_value=0.0, step=0.05, help="SPLOTCH_ANIMATION_STRENGTH")
 
 def generate_waves(dwg, C, OTHER_CONFIG):
     regular_wave_horizons = utils.linear_interpolation(C["HORIZON_Y"], C["LAST_WAVE_Y"], C["NUMBER_OF_WAVES"]) if C["SPACING_TYPE"] == "Linear" else utils.log_interpolation(C["HORIZON_Y"], C["LAST_WAVE_Y"], C["NUMBER_OF_WAVES"])
@@ -96,7 +96,7 @@ def generate_waves(dwg, C, OTHER_CONFIG):
             p_next = (end_point[0], horizon) if k == len(wave_points) - 1 else wave_points[k+1]
             control_x, control_y = utils.calculate_control(p_prev, (p_x, p_y), p_next, C["CONTROL_ARM_LENGTH"])
             from_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(p_x, C['W'])},{h(p_y, C['H'])}\n"
-            to_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(p_x, C['W'])},{h((1 + C["ANIMATION_STRENGTH"] * (random.random() - 0.5)) * p_y, C['H'])}\n"
+            to_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(p_x, C['W'])},{h((1 + C['ANIMATION_STRENGTH'] * (random.random() - 0.5)) * p_y, C['H'])}\n"
         
         # construct the the final leg
         control_x = wave_points[-1][0] + 0.5 * (end_point[0] - wave_points[-1][0])
