@@ -36,6 +36,21 @@ def splotch_settings(C, OTHER_CONFIG, sp):
             C['SHADOW_OFFSET_X'] = st.number_input("Shadow Offset X (relative to canvas width)", value=sp.get("SHADOW_OFFSET_X", 2.0), step=1.0, help="SHADOW_OFFSET_X")
             C['SHADOW_OFFSET_Y'] = st.number_input("Shadow Offset Y (relative to canvas width)", value=sp.get("SHADOW_OFFSET_Y", 2.0), step=1.0, help="SHADOW_OFFSET_Y")
     
+    with st.sidebar.expander("Texture Settings"):
+        C["IS_TEXTURED"] = st.checkbox("Add Splotch Texture", value=sp.get("IS_TEXTURED", False), help="IS_TEXTURED")
+        if C["IS_TEXTURED"]:
+            texture_types = ["fractalNoise", "turbulence"]
+            C["TEXTURE_TYPE"] = st.selectbox("Color Scheme", texture_types, index=texture_types.index(sp.get("TEXTURE_TYPE", "fractalNoise")), help="TEXTURE_TYPE")
+            C["BASE_FREQUENCY"] = st.number_input("Base Frequency", value=sp.get("BASE_FREQUENCY", 0.05), step=0.1, help="BASE_FREQUENCY")
+            C["NUM_OCTAVES"] = st.number_input("Number of Octaves", value=sp.get("NUM_OCTAVES", 20), step=1, help="NUM_OCTAVES")
+            st.divider()
+            C["SURFACE_SCALE"] = st.number_input("Surface Scale", value=sp.get("SURFACE_SCALE", 20.0), step=1.0, help="SURFACE_SCALE")
+            C["DIFFUSE_CONSTANT"] = st.number_input("Diffuse Constant", value=sp.get("DIFFUSE_CONSTANT", 1.0), step=1.0, help="DIFFUSE_CONSTANT")
+            C["LIGHTING_COLOR_INPUT"] = st.color_picker("Lighting Color", value=sp.get("LIGHTING_COLOR_INPUT", "#fff"), help="LIGHTING_COLOR_INPUT")
+            C["LIGHTING_X"] = st.number_input("Lighting X (relative to canvas width)", value=sp.get("LIGHTING_X", 20.0), step=1.0, help="LIGHTING_X")
+            C["LIGHTING_Y"] = st.number_input("Lighting Y (relative to canvas height)", value=sp.get("LIGHTING_Y", 20.0), step=1.0, help="LIGHTING_Y")
+            C["LIGHTING_Z"] = st.number_input("Lighting Z", value=sp.get("LIGHTING_Z", 20.0), step=1.0, help="LIGHTING_Z")
+    
     with st.sidebar.expander("Splotches Animation Settings"):
         C["SPLOTCH_POINTS_ANIMATED"] = st.checkbox("Animate Splotch Points", value=sp.get("SPLOTCH_POINTS_ANIMATED", True), help="SPLOTCH_POINTS_ANIMATED")
         if C["SPLOTCH_POINTS_ANIMATED"]:
@@ -60,9 +75,7 @@ def splotch_settings(C, OTHER_CONFIG, sp):
             C['MAX_SPLOTCH_ROTATION_DURATION'] = st.number_input("Max Splotch Rotation Duration", value=sp.get("MAX_SPLOTCH_ROTATION_DURATION", 5.0), min_value=0.0, step=1.0, help="MAX_SPLOTCH_ROTATION_DURATION")
 
 def generate_splotches(dwg, C, OTHER_CONFIG):
-    # TODO: Animate the blotches, either their form or their position, or both?
-    # TODO: Get some of the texture stuff in, make them look metallic and light reflecting...
-    # Define the shadow filter using feGaussianBlur and feOffset
+    # TODO: Get some of the texture stuff in, make them look metallic and light reflecting...   
     if C["HAS_SHADOW"]: 
         filter_element = dwg.filter(id="shadow", x="-50%", y="-50%", width="200%", height="200%")
         filter_element.feGaussianBlur(in_="SourceAlpha", stdDeviation=C["SHADOW_BLURRINESS"], result="blur")
@@ -70,8 +83,22 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         filter_element.feComposite(in_="floodShadow", in2="blur", operator="in", result="compositeShadow")
     
         dwg.defs.add(filter_element)
-    
+         
     for i in range(C["NUMBER_OF_SPLOTCHES"]):
+        if C["IS_TEXTURED"]:
+            ### textured filter ###
+            filter_textured = dwg.defs.add(dwg.filter(id=f'filterTextured-{i}'))
+            filter_textured.feTurbulence(type=C["TEXTURE_TYPE"], baseFrequency=C["BASE_FREQUENCY"], numOctaves=C["NUM_OCTAVES"], result="turbulence")
+            point_light = filter_textured.feDiffuseLighting(
+                in_="turbulence",
+                surfaceScale=C["SURFACE_SCALE"], 
+                diffuseConstant=C["DIFFUSE_CONSTANT"],
+                lighting_color=C["LIGHTING_COLOR_INPUT"].strip().lower(),
+                result="highlight"
+            ).fePointLight(source=(w(C["LIGHTING_X"], C['W']), h(C["LIGHTING_Y"], C['H']), C["LIGHTING_Z"]))
+            filter_textured.feComposite(operator="in", in_="highlight", in2="SourceAlpha", result="highlightApplied")
+            filter_textured.feBlend(in_="SourceGraphic", in2="highlightApplied", mode="multiply")
+        
         # Define the center & size of the circle
         c = (100 * random.random(), 100 * random.random())
         r = (C["SPLOTCH_SIZE_MAX"] - C["SPLOTCH_SIZE_MIN"]) * random.random() + C["SPLOTCH_SIZE_MIN"]
@@ -80,60 +107,18 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         
         splotch_points_regular = utils.generate_regular_points(c, number_of_splotch_points, r)
         splotch_points_from = [utils.translate_point_radially(utils.translate_point_tangentially(p, c, C["SPLOTCH_POINT_SPACING_RANDOMNESS"] * (random.random() - 0.5)), c, C["SPLOTCH_POINT_RADIAL_RANDOMNESS"] * (random.random() - 0.5)) for p in splotch_points_regular]
-        splotch_points_to = [utils.translate_point_radially(p, c, C["SPLOTCH_POINT_ANIMATION_STRENGTH"] * (random.random() - 0.5)) for p in splotch_points_from]
+        splotch_points_to = [utils.translate_point_radially(p, c, (C["SPLOTCH_POINT_ANIMATION_STRENGTH"] if C["SPLOTCH_POINTS_ANIMATED"] else 0) * (random.random() - 0.5)) for p in splotch_points_from]
         
-        start_point_from_x, start_point_from_y = splotch_points_from[0]
-        from_path_data = f"M {w(start_point_from_x, C['W'])},{h(start_point_from_y, C['H'])}\n"
-        start_point_to_x, start_point_to_y = splotch_points_to[0]
-        to_path_data = f"M {w(start_point_to_x, C['W'])},{h(start_point_to_y, C['H'])}\n"
-        
-        for k, ((from_x, from_y), (to_x, to_y))  in enumerate(zip(splotch_points_from, splotch_points_to)):
-            ### FROM
-            # find the previous and next points, wrapping around
-            from_prev = splotch_points_from[(k - 1) % len(splotch_points_from)]
-            from_next = splotch_points_from[(k + 1) % len(splotch_points_from)]
-            
-            # calculate control points for p
-            from_control_x, from_control_y = utils.calculate_control(from_prev, (from_x, from_y), from_next, C["CONTROL_ARM_LENGTH"])
-            
-            from_path_data += f"S {w(from_control_x, C['W'])},{h(from_control_y, C['H'])} {w(from_x, C['W'])},{h(from_y, C['H'])}\n"
-        
-            ### TO
-            # find the previous and next points, wrapping around
-            to_prev = splotch_points_to[(k - 1) % len(splotch_points_to)]
-            to_next = splotch_points_to[(k + 1) % len(splotch_points_to)]
-            
-            # calculate control points for p
-            to_control_x, to_control_y = utils.calculate_control(to_prev, (to_x, to_y), to_next, C["CONTROL_ARM_LENGTH"])
-            
-            to_path_data += f"S {w(to_control_x, C['W'])},{h(to_control_y, C['H'])} {w(to_x, C['W'])},{h(to_y, C['H'])}\n"
-        
-        ### FROM
-        # add the first point again, to get a smooth closure
-        from_x, from_y = splotch_points_from[0]
-        from_prev = splotch_points_from[-1]
-        from_next = splotch_points_from[1]
-        control_x, control_y = utils.calculate_control(from_prev, (from_x, from_y), from_next, C["CONTROL_ARM_LENGTH"])
-        from_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(from_x, C['W'])},{h(from_y, C['H'])}\n"
-        
-        ### TO
-        # add the first point again, to get a smooth closure
-        to_x, to_y = splotch_points_to[0]
-        to_prev = splotch_points_to[-1]
-        to_next = splotch_points_to[1]
-        control_x, control_y = utils.calculate_control(to_prev, (to_x, to_y), to_next, C["CONTROL_ARM_LENGTH"])
-        to_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(to_x, C['W'])},{h(to_y, C['H'])}\n"
-        
-        # close the path
-        from_path_data += "Z"
-        to_path_data +="Z"
+        # get path
+        from_path_data, to_path_data = get_path_data(C, splotch_points_from, splotch_points_to)
         
         # create the stripped path
         from_path = from_path_data.replace('\n', ' ').strip()
         to_path = to_path_data.replace('\n', ' ').strip()
         fill_color = C["FILL_COLOR"] if C["SINGLE_COLOR"] else random.choice(OTHER_CONFIG["COLORS"])
 
-        splotch = dwg.path(d=from_path, fill=fill_color)
+        splotch = dwg.path(d=from_path, fill=fill_color, filter=f"url(#filterTextured-{i})")
+        splotch_shadow = None
         
         if C["HAS_SHADOW"]:
             # need to offset the shadow manually and not use the offset in the filter definition as the rotation would otherwise
@@ -142,76 +127,159 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         
         # NOTE: The animation only works if x and y coordinates in the path are comma separated, and points are space separated
         # i.e. 'S 50 50, 20 20' doesn't work, but 'S 50,50 20,20' does... 
-        if C["IS_ANIMATED"]:
-            if C["SPLOTCH_POINTS_ANIMATED"]:
-                animate_splotch_points = dwg.animate(
-                    attributeName="d",
-                    dur=f"{C['SPLOTCH_POINT_ANIMATION_DURATION']}s",
-                    repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
-                    values=[from_path, to_path, from_path],
-                    keyTimes="0;0.5;1",
-                    calcMode="spline",
-                    keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
-                )
-            
-            if C["SPLOTCHES_TRANSLATE"]:
-                travel_distance_x = C["MIN_X_DISTANCE_PERC"] + (C["MAX_X_DISTANCE_PERC"] - C["MIN_X_DISTANCE_PERC"]) * random.random() # reused later
-                travel_distance_y = C["MIN_Y_DISTANCE_PERC"] + (C["MAX_Y_DISTANCE_PERC"] - C["MIN_Y_DISTANCE_PERC"]) * random.random() # reused later
-                animate_translation = dwg.animateTransform(
-                    transform="translate",
-                    repeatCount="indefinite",
-                    dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
-                    values=f"0 0;{w(travel_distance_x, C['W'])} {h(travel_distance_y, C['H'])};0 0",
-                    keyTimes="0;0.5;1",
-                    calcMode="spline",
-                    keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
-                )
-                
-                # something is failing in the svgwrite library... need to set the attributeName manually
-                animate_translation["attributeName"] = "transform"
-                    
-            if C["SPLOTCHES_ROTATE"]:    
-                animate_rotation = dwg.animateTransform(
-                    transform="rotate",
-                    repeatCount="indefinite",
-                    dur=f"{C['MIN_SPLOTCH_ROTATION_DURATION'] + (C['MAX_SPLOTCH_ROTATION_DURATION'] - C['MIN_SPLOTCH_ROTATION_DURATION']) * random.random()}s",
-                    from_=f"0 {w(c[0], C['W'])} {h(c[1], C['H'])}",
-                    to=f"360 {w(c[0], C['W'])} {h(c[1], C['H'])}",
-                    additive="sum"
-                )
-                
-                animate_rotation["attributeName"] = "transform"
-            
-            if C["HAS_SHADOW"] and C["SPLOTCHES_TRANSLATE"]:
-                # shadow needs to be translated separately because it's offset
-                animate_translation_shadow = dwg.animateTransform(
-                    transform="translate",
-                    repeatCount="indefinite",
-                    dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
-                    values=f"{w(C['SHADOW_OFFSET_X'], C['W'])} {h(C['SHADOW_OFFSET_Y'], C['H'])};{w(travel_distance_x, C['W'] + C['SHADOW_OFFSET_X'])} {h(travel_distance_y, C['H'] + C['SHADOW_OFFSET_Y'])};{w(C['SHADOW_OFFSET_X'], C['W'])} {h(C['SHADOW_OFFSET_Y'], C['H'])}",
-                    keyTimes="0;0.5;1",
-                    calcMode="spline",
-                    keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
-                )
-                
-                animate_translation_shadow["attributeName"] = "transform"
-            
-            if C["SPLOTCH_POINTS_ANIMATED"]: splotch.add(animate_splotch_points)
-            if C["SPLOTCHES_TRANSLATE"]:splotch.add(animate_translation)
-            if C["SPLOTCHES_ROTATE"]:splotch.add(animate_rotation)
-            
-            # add shadow animations
-            if C["HAS_SHADOW"]:
-                if C["SPLOTCH_POINTS_ANIMATED"]: splotch_shadow.add(animate_splotch_points)
-                if C["SPLOTCHES_TRANSLATE"]:splotch_shadow.add(animate_translation_shadow)
-                if C["SPLOTCHES_ROTATE"]:splotch_shadow.add(animate_rotation)
+        if C["IS_ANIMATED"]: add_animations(dwg, C, from_path, to_path, c, splotch, splotch_shadow, point_light)
         
-        if C["HAS_SHADOW"]: dwg.add(splotch_shadow)
+        # add splotches to group and group to drawing
+        group = dwg.g(id=f"splotch-{i}")
+        group.add(splotch)
+        if C["HAS_SHADOW"]: group.add(splotch_shadow)
         
-        dwg.add(splotch)
+        dwg.add(group)
         
     if C["HAS_NOISE"]:
         rect = dwg.rect(insert=(0, 0), size=(C['W'], C['H']), fill=random.choice(OTHER_CONFIG["COLORS"]), fill_opacity=0.2, filter="url(#noiseFilter)")
         dwg.add(rect)
     
     return dwg
+
+def get_path_data(C, splotch_points_from, splotch_points_to):
+    start_point_from_x, start_point_from_y = splotch_points_from[0]
+    from_path_data = f"M {w(start_point_from_x, C['W'])},{h(start_point_from_y, C['H'])}\n"
+    start_point_to_x, start_point_to_y = splotch_points_to[0]
+    to_path_data = f"M {w(start_point_to_x, C['W'])},{h(start_point_to_y, C['H'])}\n"
+        
+    for k, ((from_x, from_y), (to_x, to_y))  in enumerate(zip(splotch_points_from, splotch_points_to)):
+        ### FROM
+        # find the previous and next points, wrapping around
+        from_prev = splotch_points_from[(k - 1) % len(splotch_points_from)]
+        from_next = splotch_points_from[(k + 1) % len(splotch_points_from)]
+            
+        # calculate control points for p
+        from_control_x, from_control_y = utils.calculate_control(from_prev, (from_x, from_y), from_next, C["CONTROL_ARM_LENGTH"])
+            
+        from_path_data += f"S {w(from_control_x, C['W'])},{h(from_control_y, C['H'])} {w(from_x, C['W'])},{h(from_y, C['H'])}\n"
+        
+        ### TO
+        # find the previous and next points, wrapping around
+        to_prev = splotch_points_to[(k - 1) % len(splotch_points_to)]
+        to_next = splotch_points_to[(k + 1) % len(splotch_points_to)]
+            
+        # calculate control points for p
+        to_control_x, to_control_y = utils.calculate_control(to_prev, (to_x, to_y), to_next, C["CONTROL_ARM_LENGTH"])
+            
+        to_path_data += f"S {w(to_control_x, C['W'])},{h(to_control_y, C['H'])} {w(to_x, C['W'])},{h(to_y, C['H'])}\n"
+        
+    ### FROM
+    # add the first point again, to get a smooth closure
+    from_x, from_y = splotch_points_from[0]
+    from_prev = splotch_points_from[-1]
+    from_next = splotch_points_from[1]
+    control_x, control_y = utils.calculate_control(from_prev, (from_x, from_y), from_next, C["CONTROL_ARM_LENGTH"])
+    from_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(from_x, C['W'])},{h(from_y, C['H'])}\n"
+        
+    ### TO
+    # add the first point again, to get a smooth closure
+    to_x, to_y = splotch_points_to[0]
+    to_prev = splotch_points_to[-1]
+    to_next = splotch_points_to[1]
+    control_x, control_y = utils.calculate_control(to_prev, (to_x, to_y), to_next, C["CONTROL_ARM_LENGTH"])
+    to_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(to_x, C['W'])},{h(to_y, C['H'])}\n"
+        
+    # close the path
+    from_path_data += "Z"
+    to_path_data +="Z"
+    return from_path_data,to_path_data
+
+def add_animations(dwg, C, from_path, to_path, c, splotch, splotch_shadow, point_light):
+    if C["SPLOTCH_POINTS_ANIMATED"]:
+        animate_splotch_points = dwg.animate(
+            attributeName="d",
+            dur=f"{C['SPLOTCH_POINT_ANIMATION_DURATION']}s",
+            repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
+            values=[from_path, to_path, from_path],
+            keyTimes="0;0.5;1",
+            calcMode="spline",
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+        )
+    
+    if C["SPLOTCHES_TRANSLATE"]:
+        travel_distance_x = C["MIN_X_DISTANCE_PERC"] + (C["MAX_X_DISTANCE_PERC"] - C["MIN_X_DISTANCE_PERC"]) * random.random() # reused later
+        travel_distance_y = C["MIN_Y_DISTANCE_PERC"] + (C["MAX_Y_DISTANCE_PERC"] - C["MIN_Y_DISTANCE_PERC"]) * random.random() # reused later
+        animate_translation = dwg.animateTransform(
+            transform="translate",
+            repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
+            dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
+            values=f"0 0;{w(travel_distance_x, C['W'])} {h(travel_distance_y, C['H'])};0 0",
+            keyTimes="0;0.5;1",
+            calcMode="spline",
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+        )
+        
+        # need to create inverse animations for the translation of the shape.
+        # unfortunately, lights can't use animateTransform.
+        # this also means that it wouldn't be easy to get an inverse animation for the rotation.
+        animation_x_inverse = dwg.animate(
+            attributeName="x",
+            dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
+            repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
+            values=[w(C["LIGHTING_X"], C['W']), w(C["LIGHTING_X"]-travel_distance_x, C['W']), w(C["LIGHTING_X"], C['W'])],
+            keyTimes="0;0.5;1",
+            calcMode="spline",
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"          
+        )
+        
+        animation_y_inverse = dwg.animate(
+            attributeName="y",
+            dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
+            repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
+            values=[h(C["LIGHTING_Y"], C['H']), h(C["LIGHTING_Y"]-travel_distance_y, C['H']), h(C["LIGHTING_Y"], C['H'])],
+            keyTimes="0;0.5;1",
+            calcMode="spline",
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"       
+        )
+        
+        # something is failing in the svgwrite library... need to set the attributeName manually
+        animate_translation["attributeName"] = "transform"
+            
+    if C["SPLOTCHES_ROTATE"]:    
+        animate_rotation = dwg.animateTransform(
+            transform="rotate",
+            repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
+            dur=f"{C['MIN_SPLOTCH_ROTATION_DURATION'] + (C['MAX_SPLOTCH_ROTATION_DURATION'] - C['MIN_SPLOTCH_ROTATION_DURATION']) * random.random()}s",
+            from_=f"0 {w(c[0], C['W'])} {h(c[1], C['H'])}",
+            to=f"360 {w(c[0], C['W'])} {h(c[1], C['H'])}",
+            additive="sum"
+        )
+        
+        animate_rotation["attributeName"] = "transform"
+    
+    if C["HAS_SHADOW"] and C["SPLOTCHES_TRANSLATE"]:
+        # shadow needs to be translated separately because it's offset
+        animate_translation_shadow = dwg.animateTransform(
+            transform="translate",
+            repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
+            dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
+            values=f"{w(C['SHADOW_OFFSET_X'], C['W'])} {h(C['SHADOW_OFFSET_Y'], C['H'])};{w(travel_distance_x, C['W'] + C['SHADOW_OFFSET_X'])} {h(travel_distance_y, C['H'] + C['SHADOW_OFFSET_Y'])};{w(C['SHADOW_OFFSET_X'], C['W'])} {h(C['SHADOW_OFFSET_Y'], C['H'])}",
+            keyTimes="0;0.5;1",
+            calcMode="spline",
+            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+        )
+        
+        animate_translation_shadow["attributeName"] = "transform"
+    
+    if C["SPLOTCH_POINTS_ANIMATED"]:
+        splotch.add(animate_splotch_points)
+    
+    if C["SPLOTCHES_TRANSLATE"]:
+        splotch.add(animate_translation)
+        point_light.add(animation_x_inverse)
+        point_light.add(animation_y_inverse)
+    
+    if C["SPLOTCHES_ROTATE"]:
+        splotch.add(animate_rotation)
+    
+    # add shadow animations
+    if C["HAS_SHADOW"]:
+        if C["SPLOTCH_POINTS_ANIMATED"]: splotch_shadow.add(animate_splotch_points)
+        if C["SPLOTCHES_TRANSLATE"]:splotch_shadow.add(animate_translation_shadow)
+        if C["SPLOTCHES_ROTATE"]:splotch_shadow.add(animate_rotation)

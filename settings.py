@@ -27,7 +27,7 @@ def show_config_modal(CONFIG, sp):
 def settings_component(C, OTHER_CONFIG, presets):
     ##### PRESETS #####
     preset_names = [preset["name"] for preset in presets]
-    PRESET = st.sidebar.selectbox("Choose Preset", preset_names, index=preset_names.index("Slow Splotches"))
+    PRESET = st.sidebar.selectbox("Choose Preset", preset_names, index=preset_names.index("Textured Animated Splotch"))
     sp = next(preset for preset in presets if preset["name"] == PRESET) # selected preset
 
     ##### GENERAL SETTINGS #####
