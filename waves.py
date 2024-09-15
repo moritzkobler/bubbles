@@ -40,7 +40,7 @@ def wave_settings(C, OTHER_CONFIG, sp):
             C["SHADOW_COLOR"] = st.color_picker("Shadow Color", utils.complementary_color(C["FILL_COLOR"]) if C["SINGLE_COLOR"] and C["SHADOW_COLOR_COMPLEMENTARY"] else sp.get("SHADOW_COLOR", "#000"), help="SHADOW_COLOR")
             C["SHADOW_BLURRINESS"] = st.number_input("Shadow Blurriness", value=sp.get("SHADOW_BLURRINESS", 20), min_value=0, step=1, help="SHADOW_BLURRINESS")
             C["SHADOW_OPACITY"] = st.number_input("Shadow Opacity", min_value=0.0, max_value=1.0, value=sp.get("SHADOW_OPACITY", 0.2), step=0.05, help="SHADOW_OPACITY")
-            C["SHADOW_OFFSET_Y"] = st.number_input("Shadow Offset (relative, negative)", value=sp.get("SHADOW_OFFSET_Y", 2.0), step=1.0, help="SHADOW_OFFSET_Y")
+            C['SHADOW_OFFSET_Y'] = st.number_input("Shadow Offset (relative, negative)", value=sp.get("SHADOW_OFFSET_Y", 2.0), step=1.0, help="SHADOW_OFFSET_Y")
     
     with st.sidebar.expander("Wave Animation Settings"):
         C['ANIMATION_STRENGTH'] = st.number_input("Animation Strength", value=sp.get("SPLOTCH_ANIMATION_STRENGTH", 0.15), min_value=0.0, step=0.05, help="SPLOTCH_ANIMATION_STRENGTH")
@@ -52,7 +52,7 @@ def generate_waves(dwg, C, OTHER_CONFIG):
     if C["HAS_SHADOW"]: 
         filter_element = dwg.filter(id="shadow", x="-50%", y="-50%", width="200%", height="200%")
         filter_element.feGaussianBlur(in_="SourceAlpha", stdDeviation=C["SHADOW_BLURRINESS"], result="blur")
-        filter_element.feOffset(in_="blur", dx=0, dy=-h(C["SHADOW_OFFSET_Y"], C['H']), result="offsetBlur")
+        filter_element.feOffset(in_="blur", dx=0, dy=-h(C['SHADOW_OFFSET_Y'], C['H']), result="offsetBlur")
         filter_element.feFlood(flood_color=C["SHADOW_COLOR"], flood_opacity=C["SHADOW_OPACITY"], result="floodShadow")  # Set a less intense shadow color
         filter_element.feComposite(in_="floodShadow", in2="offsetBlur", operator="in", result="compositeShadow")
     

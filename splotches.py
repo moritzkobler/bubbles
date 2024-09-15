@@ -33,8 +33,8 @@ def splotch_settings(C, OTHER_CONFIG, sp):
             C["SHADOW_COLOR"] = st.color_picker("Shadow Color", utils.complementary_color(C["FILL_COLOR"]) if C["SINGLE_COLOR"] and C["SHADOW_COLOR_COMPLEMENTARY"] else sp.get("SHADOW_COLOR", "#000"), help="SHADOW_COLOR")
             C["SHADOW_BLURRINESS"] = st.number_input("Shadow Blurriness", value=sp.get("SHADOW_BLURRINESS", 20), min_value=0, step=1, help="SHADOW_BLURRINESS")
             C["SHADOW_OPACITY"] = st.number_input("Shadow Opacity", min_value=0.0, max_value=1.0, value=sp.get("SHADOW_OPACITY", 0.2), step=0.05, help="SHADOW_OPACITY")
-            C["SHADOW_OFFSET_X"] = st.number_input("Shadow Offset X (relative to canvas width)", value=sp.get("SHADOW_OFFSET_X", 2.0), step=1.0, help="SHADOW_OFFSET_X")
-            C["SHADOW_OFFSET_Y"] = st.number_input("Shadow Offset Y (relative to canvas width)", value=sp.get("SHADOW_OFFSET_Y", 2.0), step=1.0, help="SHADOW_OFFSET_Y")
+            C['SHADOW_OFFSET_X'] = st.number_input("Shadow Offset X (relative to canvas width)", value=sp.get("SHADOW_OFFSET_X", 2.0), step=1.0, help="SHADOW_OFFSET_X")
+            C['SHADOW_OFFSET_Y'] = st.number_input("Shadow Offset Y (relative to canvas width)", value=sp.get("SHADOW_OFFSET_Y", 2.0), step=1.0, help="SHADOW_OFFSET_Y")
     
     with st.sidebar.expander("Splotches Animation Settings"):
         C["SPLOTCH_POINTS_ANIMATED"] = st.checkbox("Animate Splotch Points", value=sp.get("SPLOTCH_POINTS_ANIMATED", True), help="SPLOTCH_POINTS_ANIMATED")
@@ -138,7 +138,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         if C["HAS_SHADOW"]:
             # need to offset the shadow manually and not use the offset in the filter definition as the rotation would otherwise
             # make the shadow not look quite right...
-            splotch_shadow = dwg.path(d=from_path, fill="blue", filter="url(#shadow)", transform=f"translate({w(C["SHADOW_OFFSET_X"], C['W'])} {h(C["SHADOW_OFFSET_Y"], C['H'])})")
+            splotch_shadow = dwg.path(d=from_path, fill="blue", filter="url(#shadow)", transform=f"translate({w(C['SHADOW_OFFSET_X'], C['W'])} {h(C['SHADOW_OFFSET_Y'], C['H'])})")
         
         # NOTE: The animation only works if x and y coordinates in the path are comma separated, and points are space separated
         # i.e. 'S 50 50, 20 20' doesn't work, but 'S 50,50 20,20' does... 
@@ -188,7 +188,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
                     transform="translate",
                     repeatCount="indefinite",
                     dur=f"{C["SPLOTCH_TRANSLATION_DURATION"]}s",
-                    values=f"{w(C["SHADOW_OFFSET_X"], C['W'])} {h(C["SHADOW_OFFSET_Y"], C['H'])};{w(travel_distance_x, C['W'] + C["SHADOW_OFFSET_X"])} {h(travel_distance_y, C['H'] + C["SHADOW_OFFSET_Y"])};{w(C["SHADOW_OFFSET_X"], C['W'])} {h(C["SHADOW_OFFSET_Y"], C['H'])}",
+                    values=f"{w(C['SHADOW_OFFSET_X'], C['W'])} {h(C['SHADOW_OFFSET_Y'], C['H'])};{w(travel_distance_x, C['W'] + C['SHADOW_OFFSET_X'])} {h(travel_distance_y, C['H'] + C['SHADOW_OFFSET_Y'])};{w(C['SHADOW_OFFSET_X'], C['W'])} {h(C['SHADOW_OFFSET_Y'], C['H'])}",
                     keyTimes="0;0.5;1",
                     calcMode="spline",
                     keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
