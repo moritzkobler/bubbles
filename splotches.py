@@ -39,13 +39,13 @@ def splotch_settings(C, OTHER_CONFIG, sp):
     with st.sidebar.expander("Splotches Animation Settings"):
         C["SPLOTCH_POINTS_ANIMATED"] = st.checkbox("Animate Splotch Points", value=sp.get("SPLOTCH_POINTS_ANIMATED", True), help="SPLOTCH_POINTS_ANIMATED")
         if C["SPLOTCH_POINTS_ANIMATED"]:
-            C["SPLOTCH_POINT_ANIMATION_DURATION"] = st.number_input("Splotch Point Animation Duration", value=sp.get("SPLOTCH_POINT_ANIMATION_DURATION", 5.0), min_value=0.0, step=1.0, help="SPLOTCH_POINT_ANIMATION_DURATION")
+            C['SPLOTCH_POINT_ANIMATION_DURATION'] = st.number_input("Splotch Point Animation Duration", value=sp.get("SPLOTCH_POINT_ANIMATION_DURATION", 5.0), min_value=0.0, step=1.0, help="SPLOTCH_POINT_ANIMATION_DURATION")
             C["SPLOTCH_POINT_ANIMATION_STRENGTH"] = st.number_input("Animation Strength", value=sp.get("SPLOTCH_POINT_ANIMATION_STRENGTH", 0.25), min_value=0.0, step=0.05, help="SPLOTCH_POINT_ANIMATION_STRENGTH")
             st.divider()
             
         C["SPLOTCHES_TRANSLATE"] = st.checkbox("Splotches Translate", value=sp.get("SPLOTCHES_TRANSLATE", True), help="SPLOTCHES_TRANSLATE")
         if C["SPLOTCHES_TRANSLATE"]:
-            C["SPLOTCH_TRANSLATION_DURATION"] = st.number_input("Splotch Translation Duration", value=sp.get("SPLOTCH_TRANSLATION_DURATION", 5.0), min_value=0.0, step=1.0, help="SPLOTCH_TRANSLATION_DURATION")
+            C['SPLOTCH_TRANSLATION_DURATION'] = st.number_input("Splotch Translation Duration", value=sp.get("SPLOTCH_TRANSLATION_DURATION", 5.0), min_value=0.0, step=1.0, help="SPLOTCH_TRANSLATION_DURATION")
             st.divider()
             C["MIN_X_DISTANCE_PERC"] = st.number_input("Min x distance (relative to canvas width)", value=sp.get("MIN_X_DISTANCE_PERC", 0.0), step=1.0, help="MIN_X_DISTANCE_PERC")
             C["MAX_X_DISTANCE_PERC"] = st.number_input("Max x distance (relative to canvas width)", value=sp.get("MAX_X_DISTANCE_PERC", 0.0), step=1.0, help="MAX_X_DISTANCE_PERC")
@@ -56,8 +56,8 @@ def splotch_settings(C, OTHER_CONFIG, sp):
             
         C["SPLOTCHES_ROTATE"] = st.checkbox("Rotate Splotches", value=sp.get("SPLOTCHES_ROTATE", True), help="SPLOTCHES_ROTATE")
         if C["SPLOTCHES_ROTATE"]:
-            C["MIN_SPLOTCH_ROTATION_DURATION"] = st.number_input("Min Splotch Rotation Duration", value=sp.get("MIN_SPLOTCH_ROTATION_DURATION", 5.0), min_value=0.0, step=1.0, help="MIN_SPLOTCH_ROTATION_DURATION")
-            C["MAX_SPLOTCH_ROTATION_DURATION"] = st.number_input("Max Splotch Rotation Duration", value=sp.get("MAX_SPLOTCH_ROTATION_DURATION", 5.0), min_value=0.0, step=1.0, help="MAX_SPLOTCH_ROTATION_DURATION")
+            C['MIN_SPLOTCH_ROTATION_DURATION'] = st.number_input("Min Splotch Rotation Duration", value=sp.get("MIN_SPLOTCH_ROTATION_DURATION", 5.0), min_value=0.0, step=1.0, help="MIN_SPLOTCH_ROTATION_DURATION")
+            C['MAX_SPLOTCH_ROTATION_DURATION'] = st.number_input("Max Splotch Rotation Duration", value=sp.get("MAX_SPLOTCH_ROTATION_DURATION", 5.0), min_value=0.0, step=1.0, help="MAX_SPLOTCH_ROTATION_DURATION")
 
 def generate_splotches(dwg, C, OTHER_CONFIG):
     # TODO: Animate the blotches, either their form or their position, or both?
@@ -146,7 +146,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
             if C["SPLOTCH_POINTS_ANIMATED"]:
                 animate_splotch_points = dwg.animate(
                     attributeName="d",
-                    dur=f"{C["SPLOTCH_POINT_ANIMATION_DURATION"]}s",
+                    dur=f"{C['SPLOTCH_POINT_ANIMATION_DURATION']}s",
                     repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
                     values=[from_path, to_path, from_path],
                     keyTimes="0;0.5;1",
@@ -160,7 +160,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
                 animate_translation = dwg.animateTransform(
                     transform="translate",
                     repeatCount="indefinite",
-                    dur=f"{C["SPLOTCH_TRANSLATION_DURATION"]}s",
+                    dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
                     values=f"0 0;{w(travel_distance_x, C['W'])} {h(travel_distance_y, C['H'])};0 0",
                     keyTimes="0;0.5;1",
                     calcMode="spline",
@@ -174,7 +174,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
                 animate_rotation = dwg.animateTransform(
                     transform="rotate",
                     repeatCount="indefinite",
-                    dur=f"{C["MIN_SPLOTCH_ROTATION_DURATION"] + (C["MAX_SPLOTCH_ROTATION_DURATION"] - C["MIN_SPLOTCH_ROTATION_DURATION"]) * random.random()}s",
+                    dur=f"{C['MIN_SPLOTCH_ROTATION_DURATION'] + (C['MAX_SPLOTCH_ROTATION_DURATION'] - C['MIN_SPLOTCH_ROTATION_DURATION']) * random.random()}s",
                     from_=f"0 {w(c[0], C['W'])} {h(c[1], C['H'])}",
                     to=f"360 {w(c[0], C['W'])} {h(c[1], C['H'])}",
                     additive="sum"
@@ -187,7 +187,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
                 animate_translation_shadow = dwg.animateTransform(
                     transform="translate",
                     repeatCount="indefinite",
-                    dur=f"{C["SPLOTCH_TRANSLATION_DURATION"]}s",
+                    dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
                     values=f"{w(C['SHADOW_OFFSET_X'], C['W'])} {h(C['SHADOW_OFFSET_Y'], C['H'])};{w(travel_distance_x, C['W'] + C['SHADOW_OFFSET_X'])} {h(travel_distance_y, C['H'] + C['SHADOW_OFFSET_Y'])};{w(C['SHADOW_OFFSET_X'], C['W'])} {h(C['SHADOW_OFFSET_Y'], C['H'])}",
                     keyTimes="0;0.5;1",
                     calcMode="spline",
