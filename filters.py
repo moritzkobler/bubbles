@@ -45,7 +45,7 @@ def generate_filters(dwg, C, OTHER_CONFIG):
         diffuseConstant=C["DIFFUSE_CONSTANT"],
         lighting_color=C["LIGHTING_COLOR_INPUT"].strip().lower(),
         result="highlight"
-    ).fePointLight(source=(w(C["MIN_X_PERC"], C['W']), h(C["MIN_Y_PERC"], C["H"]), C["MIN_Z"]))
+    ).fePointLight(source=(w(C["MIN_X_PERC"], C['W']), h(C["MIN_Y_PERC"], C['H']), C["MIN_Z"]))
     filter_textured.feComposite(operator="in", in_="highlight", in2="SourceAlpha", result="highlightApplied")
     filter_textured.feBlend(in_="SourceGraphic", in2="highlightApplied", mode="multiply")
 
@@ -64,7 +64,7 @@ def generate_filters(dwg, C, OTHER_CONFIG):
             attributeName="y",
             dur=f"{C['ANIMATION_DURATION']}s",
             repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
-            values=[h(C["MIN_Y_PERC"], C["H"]), h(C["MAX_Y_PERC"], C["H"]), h(C["MIN_Y_PERC"], C["H"])],  # cy values at keyframes as a list of strings
+            values=[h(C["MIN_Y_PERC"], C['H']), h(C["MAX_Y_PERC"], C['H']), h(C["MIN_Y_PERC"], C['H'])],  # cy values at keyframes as a list of strings
             keyTimes="0;0.5;1",  # Keyframe times as a space-separated string
             calcMode="spline",  # Use spline mode for smooth easing
             keySplines="0.42 0 0.58 1;0.42 0 0.58 1"  # Control points for easing
@@ -88,7 +88,7 @@ def generate_filters(dwg, C, OTHER_CONFIG):
         # it looks like the light animation doesn't properly work unless there is an actual shape that's also being animated.
         # thus, just adding a random shape and animation...
         animation_enabler = dwg.animate(attributeName="cx", from_=w(40, C['W']), to=w(60, C['W']), dur=f"{C['ANIMATION_DURATION']}s", repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1)
-        circle_enabler = dwg.circle(center=(w(50, C['W']), h(50, C["H"])), r=0, fill="black")
+        circle_enabler = dwg.circle(center=(w(50, C['W']), h(50, C['H'])), r=0, fill="black")
         circle_enabler.add(animation_enabler)
         dwg.add(circle_enabler)
 
@@ -96,9 +96,9 @@ def generate_filters(dwg, C, OTHER_CONFIG):
     fill_color = C["FILL_COLOR"] if C["SINGLE_COLOR"] else random.choice(OTHER_CONFIG["COLORS"])
     shape = None
     if C["SHAPE"] == "Circle": 
-        shape = dwg.circle(center=(w(50, C['W']), h(50, C["H"])), r=w(C["SHAPE_DIMENSIONS"]/2, C['W']), fill=fill_color, filter=f"url(#filterTextured)")
+        shape = dwg.circle(center=(w(50, C['W']), h(50, C['H'])), r=w(C["SHAPE_DIMENSIONS"]/2, C['W']), fill=fill_color, filter=f"url(#filterTextured)")
     elif C["SHAPE"] == "Square":
-        shape = dwg.rect(insert=(w((100-C["SHAPE_DIMENSIONS"])/2, C['W']), h((100-C["SHAPE_DIMENSIONS"])/2, C["H"])), size=(w(C["SHAPE_DIMENSIONS"], C['W']), w(C["SHAPE_DIMENSIONS"], C['W'])), fill=fill_color, filter=f"url(#filterTextured)")
+        shape = dwg.rect(insert=(w((100-C["SHAPE_DIMENSIONS"])/2, C['W']), h((100-C["SHAPE_DIMENSIONS"])/2, C['H'])), size=(w(C["SHAPE_DIMENSIONS"], C['W']), w(C["SHAPE_DIMENSIONS"], C['W'])), fill=fill_color, filter=f"url(#filterTextured)")
         
     dwg.add(shape)
     

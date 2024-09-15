@@ -211,7 +211,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         dwg.add(splotch)
         
     if C["HAS_NOISE"]:
-        rect = dwg.rect(insert=(0, 0), size=(C['W'], C["H"]), fill=random.choice(OTHER_CONFIG["COLORS"]), fill_opacity=0.2, filter="url(#noiseFilter)")
+        rect = dwg.rect(insert=(0, 0), size=(C['W'], C['H']), fill=random.choice(OTHER_CONFIG["COLORS"]), fill_opacity=0.2, filter="url(#noiseFilter)")
         dwg.add(rect)
     
     return dwg

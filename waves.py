@@ -52,7 +52,7 @@ def generate_waves(dwg, C, OTHER_CONFIG):
     if C["HAS_SHADOW"]: 
         filter_element = dwg.filter(id="shadow", x="-50%", y="-50%", width="200%", height="200%")
         filter_element.feGaussianBlur(in_="SourceAlpha", stdDeviation=C["SHADOW_BLURRINESS"], result="blur")
-        filter_element.feOffset(in_="blur", dx=0, dy=-h(C["SHADOW_OFFSET_Y"], C["H"]), result="offsetBlur")
+        filter_element.feOffset(in_="blur", dx=0, dy=-h(C["SHADOW_OFFSET_Y"], C['H']), result="offsetBlur")
         filter_element.feFlood(flood_color=C["SHADOW_COLOR"], flood_opacity=C["SHADOW_OPACITY"], result="floodShadow")  # Set a less intense shadow color
         filter_element.feComposite(in_="floodShadow", in2="offsetBlur", operator="in", result="compositeShadow")
     
@@ -87,28 +87,28 @@ def generate_waves(dwg, C, OTHER_CONFIG):
         end_point = (100, 100)
         
         # generate the path TODO: Make into a standalone function
-        from_path_data = f"M {w(start_point[0], C['W'])},{h(start_point[1], C["H"])}\n"
-        from_path_data += f"L {w(start_point[0], C['W'])},{h(horizon, C["H"])}\n"
+        from_path_data = f"M {w(start_point[0], C['W'])},{h(start_point[1], C['H'])}\n"
+        from_path_data += f"L {w(start_point[0], C['W'])},{h(horizon, C['H'])}\n"
         to_path_data = from_path_data # start off with the same to_path
         
         for k, (p_x, p_y) in enumerate(wave_points):
             p_prev = (start_point[0], horizon) if k == 0 else wave_points[k-1]
             p_next = (end_point[0], horizon) if k == len(wave_points) - 1 else wave_points[k+1]
             control_x, control_y = utils.calculate_control(p_prev, (p_x, p_y), p_next, C["CONTROL_ARM_LENGTH"])
-            from_path_data += f"S {w(control_x, C['W'])},{h(control_y, C["H"])} {w(p_x, C['W'])},{h(p_y, C["H"])}\n"
-            to_path_data += f"S {w(control_x, C['W'])},{h(control_y, C["H"])} {w(p_x, C['W'])},{h((1 + C["ANIMATION_STRENGTH"] * (random.random() - 0.5)) * p_y, C["H"])}\n"
+            from_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(p_x, C['W'])},{h(p_y, C['H'])}\n"
+            to_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(p_x, C['W'])},{h((1 + C["ANIMATION_STRENGTH"] * (random.random() - 0.5)) * p_y, C['H'])}\n"
         
         # construct the the final leg
         control_x = wave_points[-1][0] + 0.5 * (end_point[0] - wave_points[-1][0])
         control_y = wave_points[-1][1] + 0.5 * (horizon - wave_points[-1][1])
         
-        from_path_data += f"S {w(control_x, C['W'])},{h(control_y, C["H"])} {w(end_point[0], C['W'])},{h(horizon, C["H"])}\n"
-        from_path_data += f"L {w(end_point[0], C['W'])},{h(end_point[1], C["H"])}\n"
+        from_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(end_point[0], C['W'])},{h(horizon, C['H'])}\n"
+        from_path_data += f"L {w(end_point[0], C['W'])},{h(end_point[1], C['H'])}\n"
         from_path_data += f"Z"
         
         # add the same endpoint logic to the to_path
-        to_path_data += f"S {w(control_x, C['W'])},{h(control_y, C["H"])} {w(end_point[0], C['W'])},{h(horizon, C["H"])}\n"
-        to_path_data += f"L {w(end_point[0], C['W'])},{h(end_point[1], C["H"])}\n"
+        to_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(end_point[0], C['W'])},{h(horizon, C['H'])}\n"
+        to_path_data += f"L {w(end_point[0], C['W'])},{h(end_point[1], C['H'])}\n"
         to_path_data += f"Z"
         
         from_path = from_path_data.replace('\n', ' ').strip()
@@ -143,7 +143,7 @@ def generate_waves(dwg, C, OTHER_CONFIG):
         dwg.add(wave)
         
     if C["HAS_NOISE"]:
-        rect = dwg.rect(insert=(0, 0), size=(C['W'], C["H"]), fill=random.choice(OTHER_CONFIG["COLORS"]), fill_opacity=0.2, filter="url(#noiseFilter)")
+        rect = dwg.rect(insert=(0, 0), size=(C['W'], C['H']), fill=random.choice(OTHER_CONFIG["COLORS"]), fill_opacity=0.2, filter="url(#noiseFilter)")
         dwg.add(rect)
     
     return dwg
