@@ -22,11 +22,11 @@ sp = settings_component(C, OTHER_CONFIG, presets)
 ################# MAIN BODY #################
 # set up the drawing environment
 random.seed(C["SEED"])
-dwg = svgwrite.Drawing(size=(C["W"], C["H"]))
+dwg = svgwrite.Drawing(size=(C['W'], C["H"]))
 
 # add the default background 
 if C["HAS_BACKGROUND"]:
-    bg_rect = dwg.rect(insert=(0, 0), size=(C["W"], C["H"]), fill=C["BACKGROUND_COLOR"].strip().lower())
+    bg_rect = dwg.rect(insert=(0, 0), size=(C['W'], C["H"]), fill=C["BACKGROUND_COLOR"].strip().lower())
     dwg.add(bg_rect)
 
 if C["MODULE"] == "Bubbles": dwg = generate_bubbles(dwg, C, OTHER_CONFIG)

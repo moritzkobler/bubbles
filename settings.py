@@ -34,7 +34,7 @@ def settings_component(C, OTHER_CONFIG, presets):
     st.sidebar.header("General Settings")
     C["SEED"] = st.sidebar.number_input("Random Seed", value = sp.get("SEED", 3), help="SEED")
     with st.sidebar.expander("General Settings"):
-        C["W"] = st.number_input("Width", value=sp.get("W", 600), step=1, help="W")
+        C['W'] = st.number_input("Width", value=sp.get("W", 600), step=1, help="W")
         C["H"] = st.number_input("Height", value=sp.get("H", 600), step=1, help="H")
         valid_color_schemes = [cmap_name for cmap_name in plt.colormaps() if hasattr(plt.get_cmap(cmap_name), 'colors')]
         C["COLOR_SCHEME"] = st.selectbox("Color Scheme", valid_color_schemes, index=valid_color_schemes.index(sp.get("COLOR_SCHEME", 600)), help="COLOR_SCHEME")

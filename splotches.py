@@ -83,9 +83,9 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         splotch_points_to = [utils.translate_point_radially(p, c, C["SPLOTCH_POINT_ANIMATION_STRENGTH"] * (random.random() - 0.5)) for p in splotch_points_from]
         
         start_point_from_x, start_point_from_y = splotch_points_from[0]
-        from_path_data = f"M {w(start_point_from_x, C["W"])},{h(start_point_from_y, C['H'])}\n"
+        from_path_data = f"M {w(start_point_from_x, C['W'])},{h(start_point_from_y, C['H'])}\n"
         start_point_to_x, start_point_to_y = splotch_points_to[0]
-        to_path_data = f"M {w(start_point_to_x, C["W"])},{h(start_point_to_y, C['H'])}\n"
+        to_path_data = f"M {w(start_point_to_x, C['W'])},{h(start_point_to_y, C['H'])}\n"
         
         for k, ((from_x, from_y), (to_x, to_y))  in enumerate(zip(splotch_points_from, splotch_points_to)):
             ### FROM
@@ -96,7 +96,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
             # calculate control points for p
             from_control_x, from_control_y = utils.calculate_control(from_prev, (from_x, from_y), from_next, C["CONTROL_ARM_LENGTH"])
             
-            from_path_data += f"S {w(from_control_x, C["W"])},{h(from_control_y, C['H'])} {w(from_x, C["W"])},{h(from_y, C['H'])}\n"
+            from_path_data += f"S {w(from_control_x, C['W'])},{h(from_control_y, C['H'])} {w(from_x, C['W'])},{h(from_y, C['H'])}\n"
         
             ### TO
             # find the previous and next points, wrapping around
@@ -106,7 +106,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
             # calculate control points for p
             to_control_x, to_control_y = utils.calculate_control(to_prev, (to_x, to_y), to_next, C["CONTROL_ARM_LENGTH"])
             
-            to_path_data += f"S {w(to_control_x, C["W"])},{h(to_control_y, C['H'])} {w(to_x, C["W"])},{h(to_y, C['H'])}\n"
+            to_path_data += f"S {w(to_control_x, C['W'])},{h(to_control_y, C['H'])} {w(to_x, C['W'])},{h(to_y, C['H'])}\n"
         
         ### FROM
         # add the first point again, to get a smooth closure
@@ -114,7 +114,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         from_prev = splotch_points_from[-1]
         from_next = splotch_points_from[1]
         control_x, control_y = utils.calculate_control(from_prev, (from_x, from_y), from_next, C["CONTROL_ARM_LENGTH"])
-        from_path_data += f"S {w(control_x, C["W"])},{h(control_y, C['H'])} {w(from_x, C["W"])},{h(from_y, C['H'])}\n"
+        from_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(from_x, C['W'])},{h(from_y, C['H'])}\n"
         
         ### TO
         # add the first point again, to get a smooth closure
@@ -122,7 +122,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         to_prev = splotch_points_to[-1]
         to_next = splotch_points_to[1]
         control_x, control_y = utils.calculate_control(to_prev, (to_x, to_y), to_next, C["CONTROL_ARM_LENGTH"])
-        to_path_data += f"S {w(control_x, C["W"])},{h(control_y, C['H'])} {w(to_x, C["W"])},{h(to_y, C['H'])}\n"
+        to_path_data += f"S {w(control_x, C['W'])},{h(control_y, C['H'])} {w(to_x, C['W'])},{h(to_y, C['H'])}\n"
         
         # close the path
         from_path_data += "Z"
@@ -138,7 +138,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         if C["HAS_SHADOW"]:
             # need to offset the shadow manually and not use the offset in the filter definition as the rotation would otherwise
             # make the shadow not look quite right...
-            splotch_shadow = dwg.path(d=from_path, fill="blue", filter="url(#shadow)", transform=f"translate({w(C["SHADOW_OFFSET_X"], C["W"])} {h(C["SHADOW_OFFSET_Y"], C['H'])})")
+            splotch_shadow = dwg.path(d=from_path, fill="blue", filter="url(#shadow)", transform=f"translate({w(C["SHADOW_OFFSET_X"], C['W'])} {h(C["SHADOW_OFFSET_Y"], C['H'])})")
         
         # NOTE: The animation only works if x and y coordinates in the path are comma separated, and points are space separated
         # i.e. 'S 50 50, 20 20' doesn't work, but 'S 50,50 20,20' does... 
@@ -161,7 +161,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
                     transform="translate",
                     repeatCount="indefinite",
                     dur=f"{C["SPLOTCH_TRANSLATION_DURATION"]}s",
-                    values=f"0 0;{w(travel_distance_x, C["W"])} {h(travel_distance_y, C['H'])};0 0",
+                    values=f"0 0;{w(travel_distance_x, C['W'])} {h(travel_distance_y, C['H'])};0 0",
                     keyTimes="0;0.5;1",
                     calcMode="spline",
                     keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
@@ -175,8 +175,8 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
                     transform="rotate",
                     repeatCount="indefinite",
                     dur=f"{C["MIN_SPLOTCH_ROTATION_DURATION"] + (C["MAX_SPLOTCH_ROTATION_DURATION"] - C["MIN_SPLOTCH_ROTATION_DURATION"]) * random.random()}s",
-                    from_=f"0 {w(c[0], C["W"])} {h(c[1], C['H'])}",
-                    to=f"360 {w(c[0], C["W"])} {h(c[1], C['H'])}",
+                    from_=f"0 {w(c[0], C['W'])} {h(c[1], C['H'])}",
+                    to=f"360 {w(c[0], C['W'])} {h(c[1], C['H'])}",
                     additive="sum"
                 )
                 
@@ -188,7 +188,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
                     transform="translate",
                     repeatCount="indefinite",
                     dur=f"{C["SPLOTCH_TRANSLATION_DURATION"]}s",
-                    values=f"{w(C["SHADOW_OFFSET_X"], C["W"])} {h(C["SHADOW_OFFSET_Y"], C['H'])};{w(travel_distance_x, C["W"] + C["SHADOW_OFFSET_X"])} {h(travel_distance_y, C['H'] + C["SHADOW_OFFSET_Y"])};{w(C["SHADOW_OFFSET_X"], C["W"])} {h(C["SHADOW_OFFSET_Y"], C['H'])}",
+                    values=f"{w(C["SHADOW_OFFSET_X"], C['W'])} {h(C["SHADOW_OFFSET_Y"], C['H'])};{w(travel_distance_x, C['W'] + C["SHADOW_OFFSET_X"])} {h(travel_distance_y, C['H'] + C["SHADOW_OFFSET_Y"])};{w(C["SHADOW_OFFSET_X"], C['W'])} {h(C["SHADOW_OFFSET_Y"], C['H'])}",
                     keyTimes="0;0.5;1",
                     calcMode="spline",
                     keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
@@ -211,7 +211,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         dwg.add(splotch)
         
     if C["HAS_NOISE"]:
-        rect = dwg.rect(insert=(0, 0), size=(C["W"], C["H"]), fill=random.choice(OTHER_CONFIG["COLORS"]), fill_opacity=0.2, filter="url(#noiseFilter)")
+        rect = dwg.rect(insert=(0, 0), size=(C['W'], C["H"]), fill=random.choice(OTHER_CONFIG["COLORS"]), fill_opacity=0.2, filter="url(#noiseFilter)")
         dwg.add(rect)
     
     return dwg

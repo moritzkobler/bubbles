@@ -55,7 +55,7 @@ def generate_bubbles(dwg, C, OTHER_CONFIG):
         fill_color = f'url(#{gradient_id})' if C["HAS_GRADIENT"] else base_color
         
         # Define the circle itself
-        circle = dwg.circle(center=(w(x, C["W"]), h(y, C["H"])), r=w(r, C["W"]), fill=fill_color)
+        circle = dwg.circle(center=(w(x, C['W']), h(y, C["H"])), r=w(r, C['W']), fill=fill_color)
         if C["IS_DISTORTED"]:
             circle.attribs['filter'] = "url(#distortFilter)"
         
@@ -65,7 +65,7 @@ def generate_bubbles(dwg, C, OTHER_CONFIG):
                 attributeName="cx",
                 dur=f"{C['ANIMATION_DURATION']}s",
                 repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
-                values=[w(x, C["W"]), w(x, C["W"]) + w(distance_x, C["W"]), w(x, C["W"])],
+                values=[w(x, C['W']), w(x, C['W']) + w(distance_x, C['W']), w(x, C['W'])],
                 keyTimes="0;0.5;1",
                 calcMode="spline",
                 keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
@@ -89,7 +89,7 @@ def generate_bubbles(dwg, C, OTHER_CONFIG):
 
     # Add noise if required
     if C["HAS_NOISE"]:
-        rect = dwg.rect(insert=(0, 0), size=(C["W"], C["H"]), fill=random.choice(OTHER_CONFIG["COLORS"]), fill_opacity=0.2, filter="url(#noiseFilter)")
+        rect = dwg.rect(insert=(0, 0), size=(C['W'], C["H"]), fill=random.choice(OTHER_CONFIG["COLORS"]), fill_opacity=0.2, filter="url(#noiseFilter)")
         dwg.add(rect)
         
     return dwg
