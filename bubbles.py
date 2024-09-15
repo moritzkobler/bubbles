@@ -63,7 +63,7 @@ def generate_bubbles(dwg, C, OTHER_CONFIG):
             distance_x = (C["MAX_X_DISTANCE_PERC"] - C["MIN_X_DISTANCE_PERC"]) * random.random() + C["MIN_X_DISTANCE_PERC"]
             animate_x = dwg.animate(
                 attributeName="cx",
-                dur=f"{C["ANIMATION_DURATION"]}s",
+                dur=f"{C['ANIMATION_DURATION']}s",
                 repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
                 values=[w(x, C["W"]), w(x, C["W"]) + w(distance_x, C["W"]), w(x, C["W"])],
                 keyTimes="0;0.5;1",
@@ -74,7 +74,7 @@ def generate_bubbles(dwg, C, OTHER_CONFIG):
             distance_y = (C["MAX_Y_DISTANCE_PERC"] - C["MIN_Y_DISTANCE_PERC"]) * random.random() + C["MIN_X_DISTANCE_PERC"]
             animate_y = dwg.animate(
                 attributeName="cy",
-                dur=f"{C["ANIMATION_DURATION"]}s",
+                dur=f"{C['ANIMATION_DURATION']}s",
                 repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
                 values=[h(y, C["H"]), h(y, C["H"]) - h(distance_y, C["H"]), h(y, C["H"])],
                 keyTimes="0;0.5;1",

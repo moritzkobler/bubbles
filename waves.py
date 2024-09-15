@@ -128,7 +128,7 @@ def generate_waves(dwg, C, OTHER_CONFIG):
         if C["IS_ANIMATED"]:
             animation = dwg.animate(
                 attributeName="d",
-                dur=f"{C["ANIMATION_DURATION"]}s",
+                dur=f"{C['ANIMATION_DURATION']}s",
                 repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
                 values=[from_path, to_path, from_path],
                 keyTimes="0;0.5;1",

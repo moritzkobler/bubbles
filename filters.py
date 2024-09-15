@@ -52,7 +52,7 @@ def generate_filters(dwg, C, OTHER_CONFIG):
     if C["IS_ANIMATED"]:
         animation_x = dwg.animate(
             attributeName="x",
-            dur=f"{C["ANIMATION_DURATION"]}s",
+            dur=f"{C['ANIMATION_DURATION']}s",
             repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
             values=[w(C["MIN_X_PERC"], C["W"]), w(C["MAX_X_PERC"], C["W"]), w(C["MIN_X_PERC"], C["W"])],  # cy values at keyframes as a list of strings
             keyTimes="0;0.5;1",  # Keyframe times as a space-separated string
@@ -62,7 +62,7 @@ def generate_filters(dwg, C, OTHER_CONFIG):
         
         animation_y = dwg.animate(
             attributeName="y",
-            dur=f"{C["ANIMATION_DURATION"]}s",
+            dur=f"{C['ANIMATION_DURATION']}s",
             repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
             values=[h(C["MIN_Y_PERC"], C["H"]), h(C["MAX_Y_PERC"], C["H"]), h(C["MIN_Y_PERC"], C["H"])],  # cy values at keyframes as a list of strings
             keyTimes="0;0.5;1",  # Keyframe times as a space-separated string
@@ -73,7 +73,7 @@ def generate_filters(dwg, C, OTHER_CONFIG):
 
         animation_z = dwg.animate(
             attributeName="z",
-            dur=f"{C["ANIMATION_DURATION"]}s",
+            dur=f"{C['ANIMATION_DURATION']}s",
             repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
             values=[C["MIN_Z"], C["MAX_Z"], C["MIN_Z"], C["MAX_Z"], C["MIN_Z"]],  # cy values at keyframes as a list of strings
             keyTimes="0;0.25;0.5;0.75;1",  # Keyframe times as a space-separated string
@@ -87,7 +87,7 @@ def generate_filters(dwg, C, OTHER_CONFIG):
         
         # it looks like the light animation doesn't properly work unless there is an actual shape that's also being animated.
         # thus, just adding a random shape and animation...
-        animation_enabler = dwg.animate(attributeName="cx", from_=w(40, C["W"]), to=w(60, C["W"]), dur=f"{C["ANIMATION_DURATION"]}s", repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1)
+        animation_enabler = dwg.animate(attributeName="cx", from_=w(40, C["W"]), to=w(60, C["W"]), dur=f"{C['ANIMATION_DURATION']}s", repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1)
         circle_enabler = dwg.circle(center=(w(50, C["W"]), h(50, C["H"])), r=0, fill="black")
         circle_enabler.add(animation_enabler)
         dwg.add(circle_enabler)
