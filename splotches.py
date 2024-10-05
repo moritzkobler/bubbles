@@ -44,12 +44,12 @@ def splotch_settings(C, OTHER_CONFIG, sp):
             C["BASE_FREQUENCY"] = st.number_input("Base Frequency", value=sp.get("BASE_FREQUENCY", 0.05), step=0.1, help="BASE_FREQUENCY")
             C["NUM_OCTAVES"] = st.number_input("Number of Octaves", value=sp.get("NUM_OCTAVES", 20), step=1, help="NUM_OCTAVES")
             st.divider()
-            C["SURFACE_SCALE"] = st.number_input("Surface Scale", value=sp.get("SURFACE_SCALE", 20.0), step=1.0, help="SURFACE_SCALE")
+            C["SURFACE_SCALE_BASE"] = st.number_input("Surface Scale Base", value=sp.get("SURFACE_SCALE_BASE", 20.0), step=1.0, help="SURFACE_SCALE_BASE")
             C["DIFFUSE_CONSTANT"] = st.number_input("Diffuse Constant", value=sp.get("DIFFUSE_CONSTANT", 1.0), step=1.0, help="DIFFUSE_CONSTANT")
             C["LIGHTING_COLOR_INPUT"] = st.color_picker("Lighting Color", value=sp.get("LIGHTING_COLOR_INPUT", "#fff"), help="LIGHTING_COLOR_INPUT")
             C["LIGHTING_X"] = st.number_input("Lighting X (relative to canvas width)", value=sp.get("LIGHTING_X", 20.0), step=1.0, help="LIGHTING_X")
             C["LIGHTING_Y"] = st.number_input("Lighting Y (relative to canvas height)", value=sp.get("LIGHTING_Y", 20.0), step=1.0, help="LIGHTING_Y")
-            C["LIGHTING_Z"] = st.number_input("Lighting Z", value=sp.get("LIGHTING_Z", 20.0), step=1.0, help="LIGHTING_Z")
+            C["LIGHTING_Z"] = st.number_input("Lighting Z", value=sp.get("LIGHTING_Z", 30.0), step=1.0, help="LIGHTING_Z_BASE")
     
     with st.sidebar.expander("Splotches Animation Settings"):
         C["SPLOTCH_POINTS_ANIMATED"] = st.checkbox("Animate Splotch Points", value=sp.get("SPLOTCH_POINTS_ANIMATED", True), help="SPLOTCH_POINTS_ANIMATED")
@@ -74,24 +74,42 @@ def splotch_settings(C, OTHER_CONFIG, sp):
             C['MIN_SPLOTCH_ROTATION_DURATION'] = st.number_input("Min Splotch Rotation Duration", value=sp.get("MIN_SPLOTCH_ROTATION_DURATION", 5.0), min_value=0.0, step=1.0, help="MIN_SPLOTCH_ROTATION_DURATION")
             C['MAX_SPLOTCH_ROTATION_DURATION'] = st.number_input("Max Splotch Rotation Duration", value=sp.get("MAX_SPLOTCH_ROTATION_DURATION", 5.0), min_value=0.0, step=1.0, help="MAX_SPLOTCH_ROTATION_DURATION")
 
+    with st.sidebar.expander("Fading Effect Settings"):
+        C["ADD_FADING_EFFECT"] = st.checkbox("Add Fading Effect", value=sp.get("ADD_FADING_EFFECT", False), help="ADD_FADING_EFFECT")
+        
+        if C["ADD_FADING_EFFECT"]:
+            C["MIN_BASE_FREQUENCY"] = st.number_input("Min Base Frequency", value=sp.get("MIN_BASE_FREQUENCY", 0.01), step=0.1, help="MIN_BASE_FREQUENCY")
+            C["MAX_BASE_FREQUENCY"] = st.number_input("Max Base Frequency", value=sp.get("MAX_BASE_FREQUENCY", 0.05), step=0.1, help="MAX_BASE_FREQUENCY")
+        
+        
 def generate_splotches(dwg, C, OTHER_CONFIG):
-    # TODO: Get some of the texture stuff in, make them look metallic and light reflecting...   
     if C["HAS_SHADOW"]: 
         filter_element = dwg.filter(id="shadow", x="-50%", y="-50%", width="200%", height="200%")
         filter_element.feGaussianBlur(in_="SourceAlpha", stdDeviation=C["SHADOW_BLURRINESS"], result="blur")
-        filter_element.feFlood(flood_color=C["SHADOW_COLOR"], flood_opacity=C["SHADOW_OPACITY"], result="floodShadow")  # Set a less intense shadow color
+        filter_element.feFlood(flood_color=C["SHADOW_COLOR"], flood_opacity=C["SHADOW_OPACITY"], result="floodShadow")
         filter_element.feComposite(in_="floodShadow", in2="blur", operator="in", result="compositeShadow")
     
         dwg.defs.add(filter_element)
          
+    if C["IS_TEXTURED"]:
+        if C["ADD_FADING_EFFECT"]:
+            texture_surface_scales = utils.linear_interpolation(C["SURFACE_SCALE_BASE"], C["LIGHTING_Z"] - 1, C["NUMBER_OF_SPLOTCHES"])
+            base_frequencies = utils.linear_interpolation(C["MIN_BASE_FREQUENCY"], C["MAX_BASE_FREQUENCY"], C["NUMBER_OF_SPLOTCHES"])[::-1]
+        else:
+            texture_surface_scales = C["NUMBER_OF_SPLOTCHES"] * [C["SURFACE_SCALE_BASE"]]
+            base_frequencies = C["NUMBER_OF_SPLOTCHES"] * [C["BASE_FREQUENCY"]]
+    
     for i in range(C["NUMBER_OF_SPLOTCHES"]):
+        point_light = None
+        
         if C["IS_TEXTURED"]:
             ### textured filter ###
-            filter_textured = dwg.defs.add(dwg.filter(id=f'filterTextured-{i}'))
-            filter_textured.feTurbulence(type=C["TEXTURE_TYPE"], baseFrequency=C["BASE_FREQUENCY"], numOctaves=C["NUM_OCTAVES"], result="turbulence")
+            filter_textured = dwg.defs.add(dwg.filter(id=f'filterTextured-{i}', x="-150%", y="-150%", width="300%", height="300%"))
+            filter_textured.feTurbulence(type=C["TEXTURE_TYPE"], baseFrequency=base_frequencies[i], numOctaves=C["NUM_OCTAVES"], result="turbulence")
+            filter_textured.feOffset(dx=f"{w(5 + random.random() * 20, C['W'])}", dy=f"{h(5 + random.random() * 20, C['H'])}", in_="turbulence", result="shiftedTurbulence")
             point_light = filter_textured.feDiffuseLighting(
-                in_="turbulence",
-                surfaceScale=C["SURFACE_SCALE"], 
+                in_="shiftedTurbulence",
+                surfaceScale=texture_surface_scales[i], 
                 diffuseConstant=C["DIFFUSE_CONSTANT"],
                 lighting_color=C["LIGHTING_COLOR_INPUT"].strip().lower(),
                 result="highlight"
@@ -102,6 +120,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         # Define the center & size of the circle
         c = (100 * random.random(), 100 * random.random())
         r = (C["SPLOTCH_SIZE_MAX"] - C["SPLOTCH_SIZE_MIN"]) * random.random() + C["SPLOTCH_SIZE_MIN"]
+        if C["ADD_FADING_EFFECT"]: r = 0.2 * r + i * 0.6 * r/C["NUMBER_OF_SPLOTCHES"]
     
         number_of_splotch_points = random.choice(range(C["NUMBER_OF_SPLOTCH_POINTS_MIN"], C["NUMBER_OF_SPLOTCH_POINTS_MAX"] + 1))
         
@@ -116,6 +135,7 @@ def generate_splotches(dwg, C, OTHER_CONFIG):
         from_path = from_path_data.replace('\n', ' ').strip()
         to_path = to_path_data.replace('\n', ' ').strip()
         fill_color = C["FILL_COLOR"] if C["SINGLE_COLOR"] else random.choice(OTHER_CONFIG["COLORS"])
+        if C["ADD_FADING_EFFECT"]: fill_color = utils.hex_to_rgb_with_luminosity(C["FILL_COLOR"] if C["SINGLE_COLOR"] else random.choice(OTHER_CONFIG["COLORS"]), 0.1 + i * 0.8/C["NUMBER_OF_SPLOTCHES"])
 
         splotch = dwg.path(d=from_path, fill=fill_color, filter=f"url(#filterTextured-{i})")
         splotch_shadow = None
@@ -218,25 +238,27 @@ def add_animations(dwg, C, from_path, to_path, c, splotch, splotch_shadow, point
         # need to create inverse animations for the translation of the shape.
         # unfortunately, lights can't use animateTransform.
         # this also means that it wouldn't be easy to get an inverse animation for the rotation.
-        animation_x_inverse = dwg.animate(
-            attributeName="x",
-            dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
-            repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
-            values=[w(C["LIGHTING_X"], C['W']), w(C["LIGHTING_X"]-travel_distance_x, C['W']), w(C["LIGHTING_X"], C['W'])],
-            keyTimes="0;0.5;1",
-            calcMode="spline",
-            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"          
-        )
         
-        animation_y_inverse = dwg.animate(
-            attributeName="y",
-            dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
-            repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
-            values=[h(C["LIGHTING_Y"], C['H']), h(C["LIGHTING_Y"]-travel_distance_y, C['H']), h(C["LIGHTING_Y"], C['H'])],
-            keyTimes="0;0.5;1",
-            calcMode="spline",
-            keySplines="0.42 0 0.58 1;0.42 0 0.58 1"       
-        )
+        if C["IS_TEXTURED"]:
+            animation_x_inverse = dwg.animate(
+                attributeName="x",
+                dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
+                repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
+                values=[w(C["LIGHTING_X"], C['W']), w(C["LIGHTING_X"]-travel_distance_x, C['W']), w(C["LIGHTING_X"], C['W'])],
+                keyTimes="0;0.5;1",
+                calcMode="spline",
+                keySplines="0.42 0 0.58 1;0.42 0 0.58 1"          
+            )
+            
+            animation_y_inverse = dwg.animate(
+                attributeName="y",
+                dur=f"{C['SPLOTCH_TRANSLATION_DURATION']}s",
+                repeatCount="indefinite" if C["REPEAT_ANIMATION"] else 1,
+                values=[h(C["LIGHTING_Y"], C['H']), h(C["LIGHTING_Y"]-travel_distance_y, C['H']), h(C["LIGHTING_Y"], C['H'])],
+                keyTimes="0;0.5;1",
+                calcMode="spline",
+                keySplines="0.42 0 0.58 1;0.42 0 0.58 1"       
+            )
         
         # something is failing in the svgwrite library... need to set the attributeName manually
         animate_translation["attributeName"] = "transform"
@@ -272,8 +294,10 @@ def add_animations(dwg, C, from_path, to_path, c, splotch, splotch_shadow, point
     
     if C["SPLOTCHES_TRANSLATE"]:
         splotch.add(animate_translation)
-        point_light.add(animation_x_inverse)
-        point_light.add(animation_y_inverse)
+        
+        if C["IS_TEXTURED"]:
+            point_light.add(animation_x_inverse)
+            point_light.add(animation_y_inverse)
     
     if C["SPLOTCHES_ROTATE"]:
         splotch.add(animate_rotation)

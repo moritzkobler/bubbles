@@ -57,8 +57,11 @@ def calculate_control(prev, p, next, z=0.5):
     return (x_c, y_c)
 
 def linear_interpolation(start, end, n_steps):
-    step_size = (end - start) / (n_steps - 1)  # Calculate the step size
-    return [start + i * step_size for i in range(n_steps)]
+    try:
+        step_size = (end - start) / (n_steps - 1)  # Calculate the step size
+        return [start + i * step_size for i in range(n_steps)]
+    except ZeroDivisionError:
+        return [start]
 
 def log_interpolation(start, end, n_steps):
     # Ensure the minimum and maximum are positive (since log doesn't work with non-positive numbers)
